@@ -1,0 +1,16 @@
+[mailroute]
+# The deck bridge's identity on OpenTAKServer (= its mailbox). The bridge default is DECK-<hostname>.
+BRIDGE_UID = DECK-yourdeck
+# RabbitMQ login: the same one OpenTAKServer uses (default guest/guest, localhost only).
+RABBITMQ_HOST = localhost
+RABBITMQ_USER = guest
+RABBITMQ_PASSWORD = guest
+# How often (seconds) to check the rules (puts them back after a RabbitMQ restart).
+RECHECK = 30
+# Forget a mesh callsign (and its rule) when it hasn't been heard behind the deck for this long.
+KEEP_HOURS = 24
+STATE_FILE = ~/.mesh_mailroute.json
+# v2: the deck's bridge sends a tiny message to this made-up callsign every minute; this helper sends it back
+# into the deck's mailbox. It coming back proves the whole server -> mesh DM path and that this helper is alive
+# ("DM route: OK" on the deck's dashboard). Must match the bridge's DM_SELFTEST setting. "off" disables it.
+SELFTEST = DECK-selftest

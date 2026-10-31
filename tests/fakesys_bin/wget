@@ -1,0 +1,5 @@
+#!/bin/sh
+# install_sim.sh: the installer must work offline; record any attempt to download
+echo "wget $*" >> "$FAKESYS/network_attempts.log"
+echo "fake wget: no network here" >&2
+exit 1

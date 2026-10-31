@@ -1,0 +1,76 @@
+Metadata-Version: 2.1
+Name: takproto
+Version: 3.0.1
+Summary: TAKProto is a Python package to encode and decode TAK data.
+Home-page: https://github.com/snstac/takproto
+Maintainer: Greg Albrecht <oss@undef.net>
+Maintainer-email: oss@undef.net
+License: MIT License
+Project-URL: CI: GitHub Actions, https://github.com/snstac/takproto/actions
+Project-URL: GitHub: issues, https://github.com/snstac/takproto/issues
+Project-URL: GitHub: repo, https://github.com/snstac/takproto
+Keywords: Cursor on Target,CoT,ATAK,TAK,WinTAK,iTAK,TAK Server,TAKX,Protobuf
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Operating System :: POSIX
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: OS Independent
+Requires-Python: <4,>=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: protobuf>=4.21.0
+Provides-Extra: test
+Requires-Dist: pytest-cov; extra == "test"
+Requires-Dist: pylint; extra == "test"
+Requires-Dist: flake8; extra == "test"
+Requires-Dist: black; extra == "test"
+
+# Encode and Decode TAK data with Python
+
+TAKProto is a Python module for encoding & decoding TAK Protocol Payloads, for use 
+with [TAK Products](https://www.tak.gov/) including ATAK, WinTAK, iTAK, TAKX, TAK 
+Tracker & TAK Server. TAKProto includes functions for converting TAK Protocol 
+Protobuf messages to Python objects, and serializing CoT XML messages as Protobuf.
+
+[Documentation is available here.](https://takproto.rtfd.io/)
+
+## Copyright & License
+
+TAKProto is licensed under the MIT License.
+
+Copyright Sensors & Signals LLC https://www.snstac.com
+
+Copyright 2020 Delta Bravo-15 <deltabravo15ga@gmail.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+delimited_protobuf.py licensed under the Apache License, Version 2.0 and is 
+copyright 2024 Frank Dai https://github.com/soulmachine

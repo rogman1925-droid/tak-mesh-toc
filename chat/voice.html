@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TAK MESH TOC · Voice</title>
+<link rel="icon" href="/icon.svg">
+<style>
+/* Voice page (approved mockup 2026-10-24): talk groups, who is talking, who is on each side, recent
+   transmissions. Read-only: it shows what manet-voice reports (/api/voice, once a second). */
+@font-face { font-family: "Barlow Condensed"; font-weight: 600; src: url(/fonts/barlow-condensed-600.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; src: url(/fonts/barlow-condensed-700.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 400; src: url(/fonts/ibm-plex-mono-400.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 400; src: url(/fonts/ibm-plex-sans-400.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 600; src: url(/fonts/ibm-plex-sans-600.woff2) format("woff2"); font-display: swap; }
+:root {
+  color-scheme: dark;
+  --bg: #0c1117; --panel: #121921; --line: #222c37; --line2: #2b3846; --row: #1a222c;
+  --g: #e3e8ee; --dim: #93a1b0; --faint: #7d8a99; --ok: #4cc38a; --acc: #6ea8d8; --amber: #e3a33b; --red: #f06a63;
+  --mono: "IBM Plex Mono", ui-monospace, "DejaVu Sans Mono", monospace;
+  --sans: "IBM Plex Sans", system-ui, "DejaVu Sans", sans-serif;
+  --cond: "Barlow Condensed", "Arial Narrow", "DejaVu Sans Condensed", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--g); font-family: var(--sans); font-size: 15px; line-height: 1.35; }
+@media (min-width: 1400px) { body { font-size: 17px; } }
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 20px; padding: 8px 18px; background: #0f151c; border-bottom: 1px solid var(--line); }
+.hleft { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+h1 { margin: 0; font-family: var(--cond); font-weight: 700; font-size: 1.4em; letter-spacing: .14em; }
+.pages { display: flex; gap: 2px; }
+.pages a { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; color: var(--dim); text-decoration: none;
+  border-bottom: 2px solid transparent; font-family: var(--cond); font-weight: 600; font-size: .95em; letter-spacing: .16em; }
+.pages a[aria-current="page"] { color: var(--g); border-bottom-color: var(--acc); }
+.pages a:hover, .pages a:focus-visible { color: var(--g); outline: none; }
+.hright { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pill { border: 1px solid var(--c, var(--line2)); color: var(--c, var(--dim)); padding: 3px 9px; font-family: var(--mono); font-size: .75em; letter-spacing: .06em; white-space: nowrap; }
+.ok { --c: var(--ok); } .warn { --c: var(--amber); } .bad { --c: var(--red); } .info { --c: var(--dim); }
+#clock { font-family: var(--mono); font-size: 1.15em; padding-left: 6px; }
+main { display: flex; flex-wrap: wrap; gap: 16px; padding: 16px 18px 24px; align-items: flex-start; }
+#list { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.lhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-family: var(--cond); font-weight: 600; font-size: .85em; letter-spacing: .16em; color: var(--dim); }
+.lhead span:last-child { font-family: var(--mono); letter-spacing: 0; }
+.tg { display: grid; grid-template-columns: 4px minmax(0, 1fr); padding: 0; background: var(--panel); border: 1px solid var(--line); color: var(--g); text-align: left; cursor: pointer; font: inherit; width: 100%; }
+.tg[aria-pressed="true"] { background: #16202a; border-color: var(--acc); }
+.tg .bar { background: transparent; }
+.tg[aria-pressed="true"] .bar { background: var(--acc); }
+.tg.talking .bar { background: var(--ok); }
+.tg .in { display: flex; flex-direction: column; gap: 5px; padding: 11px 14px; min-width: 0; }
+.tg .r1 { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.tg .nm { font-family: var(--cond); font-weight: 700; font-size: 1.3em; letter-spacing: .08em; }
+.tg .st { font-family: var(--mono); font-size: .8em; color: var(--dim); text-align: right; overflow-wrap: anywhere; }
+.tg.talking .st { color: var(--ok); }
+.tg.off .st { color: #5f6c7a; }
+.tg .map { font-family: var(--mono); font-size: .8em; color: var(--dim); }
+.tg .cnt { display: flex; gap: 16px; font-size: .8em; color: #c9d3dd; }
+.tg .cnt span:last-child { margin-left: auto; color: var(--dim); }
+#detail { flex: 2 1 540px; min-width: 0; background: var(--panel); border: 1px solid var(--line); }
+.dhead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.dhead h2 { margin: 0; font-family: var(--cond); font-weight: 700; font-size: 1.45em; letter-spacing: .1em; }
+.dhead .sub { font-size: .8em; color: var(--dim); }
+.ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: #0f151c; }
+.ctl .grow { flex: 1 1 0; }
+.lbtn { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; background: transparent; color: var(--g); border: 1px solid var(--acc);
+  font-family: var(--cond); font-weight: 700; font-size: 1em; letter-spacing: .14em; cursor: pointer; }
+.lbtn:hover, .lbtn:focus-visible { background: rgba(110,168,216,.12); outline: none; }
+.lbtn[aria-pressed="true"] { background: var(--acc); color: #0c1117; }
+.meter { width: 90px; height: 8px; background: var(--row); border: 1px solid var(--line2); position: relative; overflow: hidden; }
+.meter i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--ok); transition: width .08s linear; }
+.vol { display: inline-flex; align-items: center; gap: 8px; font-family: var(--cond); font-weight: 600; font-size: .85em; letter-spacing: .14em; color: var(--dim); }
+.vol input { width: 110px; accent-color: var(--acc); }
+.swl { font-family: var(--cond); font-weight: 600; font-size: .85em; letter-spacing: .14em; color: var(--dim); }
+.sw { position: relative; width: 52px; height: 28px; border-radius: 14px; border: 1px solid var(--line2); background: var(--row); cursor: pointer; padding: 0; }
+.sw span { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--dim); transition: left .15s; }
+.sw[aria-checked="true"] { background: rgba(76,195,138,.18); border-color: var(--ok); }
+.sw[aria-checked="true"] span { left: 27px; background: var(--ok); }
+.sw:disabled { opacity: .45; cursor: not-allowed; }
+.sw:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+#bstate { font-family: var(--mono); font-size: .8em; min-width: 3ch; }
+.ctlnote { width: 100%; font-size: .78em; color: var(--dim); }
+.ctlmsg { color: var(--amber); }
+.tg .badge { font-family: var(--mono); font-size: .7em; padding: 1px 6px; border: 1px solid var(--acc); color: var(--acc); margin-left: 8px; vertical-align: .2em; letter-spacing: .04em; }
+.tg.warnch .st { color: var(--amber); }
+.chwarn { margin: 16px 16px 0; padding: 10px 14px; border: 1px solid var(--amber); color: var(--amber); font-size: .85em; line-height: 1.5; }
+.chwarn code { font-family: var(--mono); color: var(--g); }
+.now { margin: 16px; padding: 14px 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.now.live { border: 1px solid #23503a; background: rgba(76,195,138,.08); }
+.now.clear { border: 1px dashed var(--line2); color: var(--dim); font-family: var(--cond); font-weight: 600; font-size: 1.15em; letter-spacing: .12em; }
+.now .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--ok); animation: pulse .9s infinite; }
+.now .who { font-family: var(--cond); font-weight: 700; font-size: 1.8em; letter-spacing: .06em; }
+.now .via { font-family: var(--mono); font-size: .8em; padding: 2px 8px; border: 1px solid var(--line2); color: var(--dim); }
+.now .dur { margin-left: auto; font-family: var(--mono); font-size: 1.35em; color: var(--ok); }
+@keyframes pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .now .dot { animation: none; } }
+.cols { display: flex; flex-wrap: wrap; gap: 16px; padding: 0 16px 16px; }
+.box { flex: 1 1 240px; min-width: 0; border: 1px solid var(--line); }
+.box h3 { margin: 0; padding: 9px 12px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; font-family: var(--cond); font-weight: 600; font-size: .85em; letter-spacing: .16em; color: var(--dim); }
+.person { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--row); }
+.person:last-child { border-bottom: 0; }
+.person .pd { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+.person.talking .pd { background: var(--ok); }
+.person.gw .pd { background: var(--acc); }
+.person .pn { font-weight: 600; overflow-wrap: anywhere; }
+.person .pw { display: block; font-family: var(--mono); font-size: .75em; color: var(--dim); }
+.person .pt { font-family: var(--mono); font-size: .75em; color: var(--dim); }
+.person.talking .pt { color: var(--ok); }
+.empty { padding: 10px 12px; color: var(--dim); font-size: .85em; }
+.logbox { margin: 0 16px 16px; border: 1px solid var(--line); }
+.lrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 7px 12px; font-family: var(--mono); font-size: .8em; border-bottom: 1px solid var(--row); }
+.lrow:last-child { border-bottom: 0; }
+.lrow .t { color: var(--dim); flex: 0 0 76px; }
+.lrow .w { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
+.lrow .v { color: var(--dim); flex: 0 0 64px; }
+.lrow .l { flex: 0 0 52px; text-align: right; }
+.lrow.blocked .w { color: var(--amber); }
+#down { display: none; margin: 16px 18px 0; border: 1px solid var(--amber); color: var(--amber); padding: 10px 14px; }
+.hint { color: var(--dim); font-size: .85em; padding: 0 18px 18px; }
+.hint code { font-family: var(--mono); color: var(--g); }
+h1 { display: flex; align-items: center; gap: 10px; } h1 .logo { flex: none; } h1 .sub { color: var(--dim); font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <div class="hleft"><h1><img class="logo" src="/icon.svg" alt="" width="26" height="26">TAK MESH TOC <span class="sub">// CHAT</span></h1>
+    <nav class="pages" aria-label="Pages"><a href="/">CHAT</a><a href="/voice" aria-current="page">VOICE</a></nav></div>
+  <div class="hright">
+    <span class="pill info" id="pmesh">MESH VOICE ...</span>
+    <span class="pill info" id="pmum">MUMBLE ...</span>
+    <span id="clock"></span>
+  </div>
+</header>
+<div id="down" role="status"></div>
+<main>
+  <section id="list" aria-label="Talk groups">
+    <div class="lhead"><span>TALK GROUPS</span><span id="group"></span></div>
+    <div id="tgs"></div>
+  </section>
+  <section id="detail" aria-label="Selected talk group">
+    <div id="dtop"></div>
+    <div class="ctl" id="ctl">
+      <button type="button" class="lbtn" id="listen" aria-pressed="false">&#9654; LISTEN ON DECK</button>
+      <span class="meter" aria-hidden="true"><i id="lvl"></i></span>
+      <label class="vol">VOL <input id="vol" type="range" min="0" max="100" value="80" aria-label="Listening volume"></label>
+      <span class="grow"></span>
+      <span class="swl" id="swl">BRIDGE TO MUMBLE</span>
+      <button type="button" class="sw" id="bridge" role="switch" aria-checked="false" aria-labelledby="swl"><span></span></button>
+      <span id="bstate">OFF</span>
+      <div class="ctlnote" id="ctlnote" hidden>Listening and bridging are set on the deck's own screen.</div>
+      <div class="ctlnote ctlmsg" id="ctlmsg" role="status" hidden></div>
+    </div>
+    <div id="dbody" aria-live="polite"></div>
+  </section>
+</main>
+<p class="hint">Talk on a VX phone (Network: <code>wlan0</code>) or in the talk group's Mumble channel. One talker at a time per talk group.</p>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const pad = n => String(n).padStart(2, "0");
+  const zt = ts => { const d = new Date(ts * 1000); return pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes()) + ":" + pad(d.getUTCSeconds()) + "Z"; };
+  const mmss = s => Math.floor(s / 60) + ":" + pad(Math.floor(s % 60));
+  let sel = null, last = null;
+  try { sel = sessionStorage.getItem("voice.sel"); } catch (e) {}
+
+  function pill(id, text, cls) { const e = $(id); e.textContent = text; e.className = "pill " + cls; }
+
+  function render(v) {
+    last = v;
+    const down = $("down");
+    if (!v.running) {
+      down.style.display = "block";
+      down.textContent = "Voice gateway: " + (v.reason || "not running") + ". Check: meshtoc check";
+      pill("pmesh", "MESH VOICE · OFF", "warn"); pill("pmum", "MUMBLE · OFF", "warn");
+    } else {
+      down.style.display = "none";
+    }
+    const groups = v.groups || [];
+    $("group").textContent = v.mesh_group ? "mesh " + v.mesh_group : "";
+    if (v.running) {
+      const nodes = new Set(); groups.forEach(g => (g.mesh || []).forEach(m => nodes.add(m.ip)));
+      pill("pmesh", "MESH VOICE · " + nodes.size + " ON", nodes.size ? "ok" : "info");
+      const bridged = groups.filter(g => g.bridged), up = bridged.filter(g => g.mumble_up);
+      const rtt = up.map(g => g.rtt_ms).filter(x => x != null);
+      if (!bridged.length) pill("pmum", "MUMBLE · NOT BRIDGED", "info");
+      else if (up.length === bridged.length) pill("pmum", "MUMBLE · LINKED" + (rtt.length ? " " + Math.round(Math.min(...rtt)) + " ms" : ""), "ok");
+      else pill("pmum", "MUMBLE · " + up.length + "/" + bridged.length + " LINKED", up.length ? "warn" : "bad");
+    }
+    if (!groups.some(g => g.name === sel)) sel = (groups.find(g => g.talking) || groups.find(g => g.bridged) || groups[0] || {}).name || null;
+    $("tgs").innerHTML = groups.map(g => {
+      const t = g.talking;
+      const state = !g.bridged ? (t ? "● " + t.name + " (mesh only)" : "NOT BRIDGED") : t ? "● " + t.name + " TALKING" :
+        !g.mumble_up ? "MUMBLE DOWN" : !g.in_channel ? "NO MUMBLE CHANNEL" : "CLEAR";
+      const lastTx = (g.log || [])[0];
+      const right = t ? "live" : lastTx ? zt(lastTx.ts) + " " + lastTx.who.split(" (")[0] : "quiet";
+      const cls = "tg" + (t ? " talking" : "") + (!g.bridged ? " off" : "") + (g.bridged && g.mumble_up && !g.in_channel && !t ? " warnch" : "");
+      return '<button type="button" class="' + cls + '" data-tg="' + esc(g.name) + '" aria-pressed="' + (g.name === sel) + '"><span class="bar"></span><span class="in">' +
+        '<span class="r1"><span class="nm">' + esc(g.name) + (g.name === listenTg ? '<span class="badge">&#9835; LISTENING</span>' : '') + '</span><span class="st">' + esc(state) + '</span></span>' +
+        '<span class="map">:' + g.port + ' ↔ ' + (g.bridged ? 'Mumble "' + esc(g.channel) + '"' : 'not bridged') + '</span>' +
+        '<span class="cnt"><span>' + (g.mesh || []).length + ' on mesh</span><span>' + (g.mumble || []).length + ' on Mumble</span><span>' + esc(right) + '</span></span>' +
+        '</span></button>';
+    }).join("");
+    const g = groups.find(x => x.name === sel);
+    $("dtop").innerHTML = g ? head(g) : "";
+    $("dbody").innerHTML = g ? detail(g) : '<div class="empty">No talk groups yet.</div>';
+    controls(g, v);
+  }
+
+  function people(list, gw) {
+    if (!list.length && !gw) return '<div class="empty">nobody heard in the last 15 s</div>';
+    let h = list.map(p => '<div class="person' + (p.talking ? " talking" : "") + '"><span class="pd"></span><span><span class="pn">' + esc(p.name) +
+      '</span><span class="pw">' + esc(p.what ? p.what + (p.ip && p.name !== p.ip ? " · " + p.ip : "") : "Mumble") + '</span></span><span class="pt">' + (p.talking ? "● TALKING" : "listening") + '</span></div>').join("");
+    if (gw) h += '<div class="person gw"><span class="pd"></span><span><span class="pn">this deck</span><span class="pw">voice gateway</span></span><span class="pt">' + esc(gw) + '</span></div>';
+    return h;
+  }
+
+  function head(g) {
+    return '<div class="dhead"><div><h2>' + esc(g.name) + '</h2><div class="sub">mesh ' + esc(last.mesh_group || "") + ":" + g.port + " ↔ " +
+      (g.bridged ? 'Mumble channel "' + esc(g.channel) + '"' : "not bridged to Mumble") + " · one talker at a time</div></div></div>";
+  }
+
+  // ---- controls: listen on the deck, bridge on/off (deck screen only: v.control)
+  let listenTg = null;
+  function controls(g, v) {
+    const ctl = $("ctl"), can = !!(v && v.running && v.control);
+    ctl.hidden = !g;
+    if (!g) return;
+    const on = g.name === listenTg;
+    $("listen").setAttribute("aria-pressed", on);
+    $("listen").innerHTML = on ? "&#9632; STOP LISTENING" : "&#9654; LISTEN ON DECK";
+    $("listen").disabled = !can && !on;                 // stopping always works
+    $("bridge").setAttribute("aria-checked", !!g.bridged);
+    $("bridge").disabled = !can;
+    $("bstate").textContent = g.bridged ? "ON" : "OFF";
+    $("ctlnote").hidden = can || !(v && v.running);
+  }
+  function setLevel(x) { $("lvl").style.width = Math.round(Math.max(0, Math.min(1, x)) * 100) + "%"; }
+  let noteTimer = 0;
+  function note(text) {
+    const n = $("ctlmsg"); n.textContent = text; n.hidden = false;
+    clearTimeout(noteTimer); noteTimer = setTimeout(() => { n.hidden = true; }, 8000);
+  }
+
+  // Listen on deck: raw 16-bit 48 kHz mono from manet-voice, played with a small jitter buffer (about 150 ms).
+  let audio = null, level = 0;
+  try { $("vol").value = localStorage.getItem("voice.vol") || 80; } catch (e) {}
+  $("vol").addEventListener("input", () => {
+    if (audio) audio.gain.gain.value = $("vol").value / 100;
+    try { localStorage.setItem("voice.vol", $("vol").value); } catch (e) {}
+  });
+  function stopListen() {
+    if (audio) { audio.abort.abort(); audio.ctx.close().catch(() => {}); }
+    audio = null; listenTg = null; level = 0; setLevel(0);
+    if (last) render(last);
+  }
+  function startListen(tg) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return note("This browser can't play audio.");
+    const ctx = new AC(), gain = ctx.createGain(), abort = new AbortController();
+    gain.gain.value = $("vol").value / 100; gain.connect(ctx.destination);
+    const me = audio = { ctx, gain, abort, next: 0 };
+    listenTg = tg; if (last) render(last);
+    fetch("/api/voice/listen?tg=" + encodeURIComponent(tg), { signal: abort.signal, cache: "no-store" }).then(r => {
+      if (!r.ok) return r.json().catch(() => ({})).then(j => { throw new Error(j.error || "HTTP " + r.status); });
+      const rd = r.body.getReader(); let carry = null;
+      const pump = () => rd.read().then(({ done, value }) => {
+        if (done || audio !== me) { if (audio === me) { stopListen(); note("Listening stopped: the voice service restarted."); } return; }
+        let bytes = value;
+        if (carry) { const b = new Uint8Array(carry.length + value.length); b.set(carry); b.set(value, carry.length); bytes = b; carry = null; }
+        if (bytes.length % 2) { carry = bytes.slice(-1); bytes = bytes.slice(0, -1); }
+        play(me, new Int16Array(bytes.buffer, bytes.byteOffset, bytes.length / 2));
+        return pump();
+      });
+      return pump();
+    }).catch(e => { if (audio === me) { stopListen(); note("Can't listen: " + e.message); } });
+  }
+  function play(a, s16) {
+    if (!s16.length) return;
+    const n = s16.length, buf = a.ctx.createBuffer(1, n, 48000), ch = buf.getChannelData(0);
+    let sum = 0;
+    for (let i = 0; i < n; i++) { const v = s16[i] / 32768; ch[i] = v; sum += v * v; }
+    level = Math.max(level, Math.min(1, Math.sqrt(sum / n) * 4));
+    const now = a.ctx.currentTime;
+    if (a.next < now + 0.03) a.next = now + 0.15;           // start, or after a gap: build the jitter buffer again
+    if (a.next > now + 1.0) return;                          // never let a backlog build up: drop
+    const src = a.ctx.createBufferSource(); src.buffer = buf; src.connect(a.gain); src.start(a.next);
+    a.next += n / 48000;
+  }
+  setInterval(() => { if (audio) { setLevel(level); level *= 0.6; } }, 100);
+  $("listen").addEventListener("click", () => {
+    const again = listenTg === sel;
+    if (audio) stopListen();
+    if (!again && sel) startListen(sel);
+  });
+  $("bridge").addEventListener("click", () => {
+    const g = last && (last.groups || []).find(x => x.name === sel);
+    if (!g) return;
+    $("bridge").disabled = true;
+    fetch("/api/voice/bridge", { method: "POST", headers: { "Content-Type": "application/json", "X-Deck": "1" }, body: JSON.stringify({ tg: g.name, on: !g.bridged }) })
+      .then(r => r.json().then(j => { if (!r.ok || !j.ok) note("Not changed: " + (j.error || "HTTP " + r.status)); }))
+      .catch(() => note("Not changed: Chat is not answering")).then(poll);
+  });
+
+  function detail(g) {
+    const t = g.talking;
+    let h = "";
+    if (g.bridged && g.mumble_up && !g.in_channel)
+      h += '<div class="chwarn">Mumble has no channel "' + esc(g.channel) + '" yet. Make it once, on any computer with the package:<br><code>python3 voice/make_channel.py ' +
+        esc(g.channel) + ' &lt;server&gt;</code></div>';
+    if (t) h += '<div class="now live"><span class="dot"></span><span class="who">' + esc(t.name) + '</span><span class="via">' + esc(t.via.toUpperCase()) +
+      '</span><span class="dur">TALKING ' + mmss(t.secs) + "</span></div>";
+    else {
+      const l = (g.log || [])[0];
+      h += '<div class="now clear">CHANNEL CLEAR' + (l ? " · last: " + esc(l.who.split(" (")[0]) + " " + zt(l.ts) : "") + "</div>";
+    }
+    let gw = null;
+    if (g.bridged) gw = !g.mumble_up ? "Mumble down" : !g.in_channel ? "no channel " + g.channel : "bridging";
+    h += '<div class="cols"><div class="box"><h3><span>ON THE MESH</span><span>' + (g.mesh || []).length + "</span></h3>" + people(g.mesh || [], null) + "</div>" +
+      '<div class="box"><h3><span>ON MUMBLE</span><span>' + (g.mumble || []).length + "</span></h3>" +
+      (g.bridged ? people((g.mumble || []).map(m => Object.assign({ what: "Mumble" }, m)), gw) : '<div class="empty">not bridged: switch on BRIDGE TO MUMBLE to link it to channel "' + esc(g.name) + '"</div>') + "</div></div>";
+    const log = g.log || [];
+    h += '<div class="logbox"><h3 style="margin:0;padding:9px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;font-family:var(--cond);font-weight:600;font-size:.85em;letter-spacing:.16em;color:var(--dim)"><span>RECENT TRANSMISSIONS</span><span style="font-family:var(--mono);letter-spacing:0">who · from · length</span></h3>' +
+      (log.length ? log.map(l => '<div class="lrow' + (l.blocked ? " blocked" : "") + '"><span class="t">' + zt(l.ts) + '</span><span class="w">' + esc(l.who) +
+        '</span><span class="v">' + esc(l.via) + '</span><span class="l">' + (l.blocked ? "" : l.len.toFixed(1) + " s") + "</span></div>").join("") :
+        '<div class="empty">no transmissions yet</div>') + "</div>";
+    return h;
+  }
+
+  $("tgs").addEventListener("click", e => {
+    const b = e.target.closest("[data-tg]");
+    if (!b) return;
+    sel = b.dataset.tg;
+    try { sessionStorage.setItem("voice.sel", sel); } catch (err) {}
+    if (last) render(last);
+  });
+  function poll() {
+    fetch("/api/voice", { cache: "no-store" }).then(r => r.json()).then(render)
+      .catch(() => render({ running: false, reason: "Chat is not answering", groups: [] }));
+  }
+  function clock() { const d = new Date(); $("clock").textContent = pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes()) + ":" + pad(d.getUTCSeconds()) + "Z"; }
+  poll(); clock(); setInterval(poll, 1000); setInterval(clock, 1000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TAK MESH TOC · Chat</title>
+<link rel="icon" href="/icon.svg">
+<style>
+/* TAK MESH TOC Chat. One look: slate background, condensed headings (Barlow Condensed), text in IBM Plex Sans, data in
+   IBM Plex Mono, green only for "ok", steel blue for what is selected. Fonts are bundled in common/fonts (SIL OFL). */
+@font-face { font-family: "Barlow Condensed"; font-weight: 600; src: url(/fonts/barlow-condensed-600.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; src: url(/fonts/barlow-condensed-700.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 400; src: url(/fonts/ibm-plex-mono-400.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 400; src: url(/fonts/ibm-plex-sans-400.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 600; src: url(/fonts/ibm-plex-sans-600.woff2) format("woff2"); font-display: swap; }
+@keyframes blink { 50% { opacity: .2; } }
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--g); font-family: var(--sans); font-size: 15px; line-height: 1.35; display: flex; flex-direction: column; gap: 10px; overflow: hidden; padding: 10px max(10px, env(safe-area-inset-right, 0px)) 10px max(10px, env(safe-area-inset-left, 0px)); padding-top: 0; }
+@media (min-width: 1400px) { body { font-size: 17px; } }
+button, input, select, textarea { font: inherit; }
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; flex: none; margin: 0 -10px; padding: 8px 18px; background: #0f151c; border-bottom: 1px solid var(--line); }
+h1 { margin: 0; font-size: 1.4em; font-weight: 700; letter-spacing: .14em; white-space: nowrap; font-family: var(--cond); }
+h1 small { color: var(--dim); letter-spacing: .03em; font-size: .62em; margin-left: .6em; font-family: var(--sans); }
+.hright { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pill { border: 1px solid var(--c, var(--line2)); color: var(--c, var(--dim)); padding: 3px 9px; letter-spacing: .08em; font-size: .75em; white-space: nowrap; font-family: var(--mono); }
+.ok { --c: var(--ok); }
+.warn { --c: var(--amber); }
+.bad { --c: var(--red); }
+.info { --c: var(--dim); }
+.hide { display: none !important; }
+.tbtn { background: transparent; border: 1px solid var(--line2); color: var(--g); padding: 4px 10px; cursor: pointer; letter-spacing: .14em; font-size: .9em; min-height: 32px; font-family: var(--cond); font-weight: 600; }
+.tbtn:hover, .tbtn:focus-visible { color: var(--g); border-color: var(--acc); outline: none; }
+#banner { display: none; border: 1px solid var(--red); color: var(--red); padding: 6px 10px; flex: none; }
+#main { flex: 1; min-height: 0; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 12px; }
+@media (max-width: 899px) { #main { grid-template-columns: 1fr; } body #roster { display: none; } body.showroster #roster { display: flex; } body.showroster #main { grid-template-rows: auto minmax(0, 1fr); } body.showroster #roster { max-height: 34vh; order: -1; } }
+#leftcol { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+#tabs { display: flex; gap: 6px; flex-wrap: wrap; flex: none; }
+#tabs button { background: transparent; color: var(--dim); border: 1px solid var(--line2); padding: 6px 12px; cursor: pointer; letter-spacing: .12em; font-size: .92em; font-family: var(--cond); font-weight: 600; }
+#tabs button.on { color: var(--g); background: var(--tint); border-color: var(--acc); }
+#tabs button .badge { margin-left: 6px; background: var(--acc); color: var(--bg); padding: 0 5px; font-size: .85em; font-family: var(--mono); }
+#tabs button .x { margin-left: 8px; opacity: .6; }
+#logwrap { position: relative; min-height: 0; display: flex; flex: 1; }
+.m.hidden { display: none; }
+#rlist .r { cursor: pointer; }
+#rlist .r:hover .cs { text-decoration: underline; }
+#rlist .r .dm { color: var(--faint); font-size: .75em; margin-left: 6px; }
+#rlist .r.nodm { cursor: default; opacity: .6; }
+#log { flex: 1; overflow-y: auto; border: 1px solid var(--line); background: var(--panel); padding: 8px 14px 8px 0; }
+#log:empty::before { content: "No messages yet. Type and press Enter, or /help for commands."; color: var(--dim); padding-left: 12px; display: block; }
+.m { display: grid; grid-template-columns: 5.4em 1fr; gap: 2px 12px; padding: 7px 0 7px 12px; border-left: 3px solid var(--bar, var(--dim)); margin: 3px 0; border-left-width: 2px; }
+.m.src-mesh { --bar: transparent; }
+.m.src-server { --bar: transparent; }
+.m.src-me { --bar: var(--acc); background: #16202a; }
+.m .t { color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; font-family: var(--mono); font-size: .8em; padding-top: .15em; }
+.m .who { color: var(--g); text-shadow: none; font-weight: 600; }
+.m.src-server .who { color: var(--g); text-shadow: none; }
+.m.src-me .who { color: var(--acc); text-shadow: none; }
+.m .txt { grid-column: 2; white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
+.m .tick { margin-left: 8px; font-size: .8em; letter-spacing: .06em; color: var(--dim); font-family: var(--mono); }
+.m .tick.ok { color: var(--ok); }
+.m .tick.warn { color: var(--amber); }
+.m .tick.bad { color: var(--red); }
+.m .tick button { background: transparent; border: 1px solid currentColor; color: inherit; font-size: .9em; padding: 0 6px; margin-left: 6px; cursor: pointer; }
+.m.dropped .txt { text-decoration: line-through; color: var(--faint); }
+.m .prec { font-size: .75em; letter-spacing: .1em; padding: 0 5px; margin-left: 8px; border: 1px solid currentColor; font-family: var(--mono); }
+.m.p-flash { --bar: var(--red); background: rgba(240,106,99,.08); }
+.m.p-flash .prec { color: var(--red); }
+.m.p-immediate { --bar: var(--amber); }
+.m.p-immediate .prec { color: var(--amber); }
+.m.p-priority .prec { color: var(--amber); }
+.m.new { background: var(--tint); }
+#newbar { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: var(--acc); color: var(--bg); border: 0; padding: 6px 14px; letter-spacing: .1em; cursor: pointer; font-family: var(--cond); font-weight: 600; }
+#roster { display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--line); background: var(--panel); order: -1; }
+#roster h2 { margin: 0; padding: 10px 14px; font-size: .9em; font-weight: 600; letter-spacing: .16em; color: var(--dim); border-bottom: 1px solid var(--line); font-family: var(--cond); }
+#rlist { flex: 1; overflow-y: auto; padding: 4px 0; }
+#rlist .r { display: flex; justify-content: space-between; gap: 8px; padding: 7px 14px; }
+#rlist .r .cs { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+#rlist .r .cs::before { content: ""; margin-right: 10px; color: var(--dim); font-size: .8em; display: inline-block; width: .6em; height: .6em; background: var(--dim); vertical-align: .05em; }
+#rlist .r.srv .cs::before { color: var(--srv); background: var(--srv); }
+#rlist .r .age { color: var(--faint); font-variant-numeric: tabular-nums; }
+#rlist:empty::before { content: "nobody heard yet"; color: var(--faint); padding: 3px 10px; display: block; }
+#legend { border-top: 1px solid var(--line); padding: 8px 14px; font-size: .78em; color: var(--dim); line-height: 1.6; }
+#legend b { font-weight: 400; }
+.lg-m { color: var(--dim); }
+.lg-s { color: var(--srv); }
+.lg-me { color: var(--acc); }
+#quick { display: flex; gap: 6px; flex-wrap: wrap; flex: none; }
+#quick button { background: transparent; color: var(--g); border: 1px solid var(--line2); padding: 4px 10px; min-height: 34px; cursor: pointer; font-size: .9em; font-family: var(--cond); font-weight: 600; letter-spacing: .1em; }
+#quick button kbd { color: var(--dim); font-family: var(--mono); margin-right: 6px; }
+form#f { display: flex; gap: 8px; flex: none; }
+#text { flex: 1; min-width: 0; background: var(--bg); color: var(--g); border: 1px solid var(--line2); padding: 10px 12px; min-height: 46px; caret-color: var(--g); font-family: var(--sans); }
+#text:focus { outline: none; border-color: var(--acc); box-shadow: none; }
+#text::placeholder { color: var(--dim); }
+#sendb { background: var(--acc); color: var(--bg); border: 0; padding: 0 22px; min-height: 46px; letter-spacing: .16em; cursor: pointer; font-family: var(--cond); font-weight: 700; }
+#sendb:disabled { background: var(--line2); color: var(--dim); }
+#hint { min-height: 1.3em; font-size: .85em; color: var(--faint); flex: none; white-space: pre-wrap; }
+#hint.err { color: var(--red); }
+#hint.help { color: var(--dim); max-height: 40vh; overflow-y: auto; border: 1px solid var(--line); padding: 6px 10px; }
+#hint .k { color: var(--g); }
+#modal { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: flex; align-items: flex-start; justify-content: center; padding: 10px; overflow-y: auto; }
+#modal .box { background: var(--panel); border: 1px solid var(--g); box-shadow: none; width: min(760px, 100%); margin: auto 0; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; border-color: var(--line2); }
+#modal h2 { margin: 0; font-size: 1em; font-weight: 700; letter-spacing: .14em; text-shadow: none; display: flex; justify-content: space-between; gap: 10px; font-family: var(--cond); }
+#modal h2 small { color: var(--faint); letter-spacing: .04em; font-size: .75em; }
+#modal .row { display: grid; grid-template-columns: 11em 1fr; gap: 8px; align-items: center; }
+#modal label { color: var(--dim); font-size: .85em; }
+#modal input, #modal select { background: var(--bg); color: var(--g); border: 1px solid var(--line2); padding: 4px 8px; min-height: 32px; width: 100%; }
+#modal input:focus, #modal select:focus { outline: none; border-color: var(--g); }
+#modal input::placeholder { color: var(--faint); }
+#modal pre { margin: 0; background: var(--panel); border: 1px dashed var(--line2); padding: 6px 8px; white-space: pre-wrap; color: var(--dim); font-size: .8em; max-height: 9.5em; overflow-y: auto; }
+#modal .acts { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+#modal .acts span { color: var(--red); margin-right: auto; font-size: .85em; }
+@media (max-width: 600px) { #modal .row { grid-template-columns: 1fr; gap: 2px; } }
+:root { color-scheme: dark; --bg: #0c1117; --panel: #121921; --line: #222c37; --line2: #2b3846; --g: #e3e8ee; --dim: #93a1b0; --faint: #7d8a99; --ok: #4cc38a; --acc: #6ea8d8; --amber: #e3a33b; --red: #f06a63; --srv: #c9a86a; --tint: rgba(110,168,216,.10); --mono: "IBM Plex Mono", ui-monospace, "DejaVu Sans Mono", monospace; --sans: "IBM Plex Sans", system-ui, "DejaVu Sans", sans-serif; --cond: "Barlow Condensed", "Arial Narrow", "DejaVu Sans Condensed", sans-serif; }
+#rlist .r .age, #rlist .r .dm { font-family: var(--mono); font-size: .8em; color: var(--dim); }
+.m.src-server .who::after { content: "SERVER"; margin-left: 8px; font-family: var(--mono); font-weight: 400; font-size: .7em; padding: 1px 6px; border: 1px solid var(--line2); color: var(--dim); vertical-align: .1em; }
+.m.src-mesh .who::after { content: "MESH"; margin-left: 8px; font-family: var(--mono); font-weight: 400; font-size: .7em; padding: 1px 6px; border: 1px solid var(--line2); color: var(--dim); vertical-align: .1em; }
+#hint, #hint.help { color: var(--dim); font-family: var(--mono); }
+.hleft { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.pages { display: flex; gap: 2px; }
+.pages a { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; color: var(--dim); text-decoration: none; border-bottom: 2px solid transparent; font-family: var(--cond); font-weight: 600; font-size: .95em; letter-spacing: .16em; }
+.pages a[aria-current="page"] { color: var(--g); border-bottom-color: var(--acc); }
+.pages a:hover, .pages a:focus-visible { color: var(--g); outline: none; }
+#vdot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: blink 1s steps(2) infinite; }
+@media (prefers-reduced-motion: reduce) { #vdot { animation: none; } }
+h1 { display: flex; align-items: center; gap: 10px; } h1 .logo { flex: none; } h1 .sub { color: var(--dim); font-weight: 600; }
+@media (max-width: 600px) { h1 small { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="hleft"><h1><img class="logo" src="/icon.svg" alt="" width="26" height="26">TAK MESH TOC <span class="sub">// CHAT</span> <small id="who">ALL CHAT ROOMS</small></h1>
+    <nav class="pages" aria-label="Pages"><a href="/" aria-current="page">CHAT</a><a href="/voice" id="voicelink">VOICE<span id="vdot" class="hide"></span></a></nav></div>
+  <div class="hright">
+    <span class="pill info" id="pmesh" title="Mesh side (eth0 to the node)">MESH ...</span>
+    <span class="pill info" id="psrv" title="Server relay through manet-bridge">SERVER ...</span>
+    <span class="pill warn hide" id="pout" title="Messages waiting to go out">OUTBOX</span>
+    <button class="tbtn" id="zbtn" type="button" title="Time zone (/z)">LOCAL</button>
+  </div>
+</header>
+<div id="banner" role="alert">Chat service not answering. Check: systemctl status manet-chat</div>
+<div id="main">
+  <div id="leftcol">
+    <div id="tabs" role="tablist" aria-label="Conversations"></div>
+    <div id="logwrap">
+      <div id="log" role="log" aria-live="polite" aria-label="Chat messages"></div>
+      <button id="newbar" class="hide" type="button">NEW MESSAGES (End)</button>
+    </div>
+  </div>
+  <aside id="roster" aria-label="On net">
+    <h2 id="rtitle">ON NET</h2>
+    <div id="rlist"></div>
+    <div id="legend"><b class="lg-m">&#9612;</b> mesh &nbsp; <b class="lg-s">&#9612;</b> server &nbsp; <b class="lg-me">&#9612;</b> me<br>&#10003; on mesh &nbsp; &#10003;&#10003; + server<br>click a name to DM</div>
+  </aside>
+</div>
+<div id="quick" aria-label="Quick messages"></div>
+<form id="f" autocomplete="off">
+  <input id="text" maxlength="1000" placeholder="Message to All Chat Rooms  ( / for commands )" enterkeyhint="send" aria-label="Message">
+  <button id="sendb" type="submit">SEND</button>
+</form>
+<div id="hint" aria-live="polite"></div>
+<div id="modal" class="hide" role="dialog" aria-modal="true" aria-labelledby="mtitle"><div class="box" id="mbox"></div></div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const pad = n => String(n).padStart(2, "0");
+  const MON = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+  let seq = 0, loaded = false, info = null, fails = 0, unseen = 0;
+  let active = "ALL";                       // conversation shown: "ALL" or the other person's UID
+  const threads = new Map();                // uid -> {name, unread}
+  const rows = new Map();
+  let zulu = store.get("deckchat.zulu") === "1";
+  const applyZulu = () => { $("zbtn").textContent = zulu ? "ZULU" : "LOCAL"; for (const r of rows.values()) render(r._m); };
+  $("zbtn").textContent = zulu ? "ZULU" : "LOCAL";
+  const toggleZulu = () => { zulu = !zulu; store.set("deckchat.zulu", zulu ? "1" : "0"); applyZulu(); };
+  $("zbtn").onclick = toggleZulu;
+
+  function dtgZ(d) { return pad(d.getUTCDate()) + pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + "Z " + MON[d.getUTCMonth()] + " " + String(d.getUTCFullYear()).slice(2); }
+  function stamp(ts) {
+    const d = new Date(ts * 1000), now = new Date();
+    if (zulu) {
+      const t = pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + "Z";
+      return d.getUTCDate() === now.getUTCDate() && now - d < 864e5 ? t : pad(d.getUTCDate()) + t;
+    }
+    const t = pad(d.getHours()) + ":" + pad(d.getMinutes());
+    return d.toDateString() === now.toDateString() ? t : (d.getMonth() + 1) + "/" + d.getDate() + " " + t;
+  }
+
+  // ---------- messages
+  const PREC = /^\s*(FLASH|IMMEDIATE|PRIORITY)\b[:\s-]*/i;
+  function tick(m) {
+    switch (m.status) {
+      case "queued": return ["warn", "QUEUED", m.error || "waiting for the mesh"];
+      case "sending": return ["", "...", "sending"];
+      case "held": return ["bad", "HELD", m.error || "waited too long"];
+      case "dropped": return ["", "DROPPED", "not sent"];
+    }
+    if (m.dm) {
+      if (m.path === "mesh") return m.delivered ? ["ok", "✓✓", "delivered to their phone over the mesh"] : ["", "✓", "sent over the mesh"];
+      return ["", "✓", "handed to the server for delivery"];
+    }
+    if (m.path === "server-all") return ["", "SRV ✓", "sent to the server only (no node): server phones get it, mesh phones don't"];
+    if (m.relayed) return ["ok", "✓✓", "on the mesh and relayed to the server"];
+    const late = Date.now() / 1000 - (m.sent_ts || m.ts) > 8;
+    if (late && info && !info.bridge.running) return ["warn", "✓", "on the mesh only: bridge is down, the server did not get it"];
+    return ["", "✓", late ? "on the mesh; no relay confirmation from the bridge" : "on the mesh"];
+  }
+  function render(m) {
+    let r = rows.get(m.id);
+    const fresh = !r;
+    if (!r) { r = el("div"); rows.set(m.id, r); }
+    const pm = PREC.exec(m.text || "");
+    const prec = pm ? pm[1].toUpperCase() : "";
+    const src = m.mine ? "me" : (m.src === "server" ? "server" : "mesh");
+    r.className = "m src-" + src + (prec ? " p-" + prec.toLowerCase() : "") + (m.status === "dropped" ? " dropped" : "") +
+      (fresh && loaded && !m.mine ? " new" : (r.classList.contains("new") ? " new" : ""));
+    r.title = src === "me" ? "sent by you" : (src === "server" ? "from the server" : "heard on the mesh");
+    r.replaceChildren();
+    r.append(el("span", "t", stamp(m.ts)));
+    const head = el("span");
+    head.append(el("span", "who", m.from || "?"));
+    if (prec) head.append(el("span", "prec", prec));
+    const th = m.thread || "ALL";
+    if (m.dm) head.append(el("span", "prec", m.mine ? "DM → " + (m.to || m.room) : "DM"));
+    else if (m.room && m.room !== "All Chat Rooms") head.append(el("span", "prec", m.room));
+    r.dataset.thread = th;
+    r.classList.toggle("hidden", th !== active);
+    if (m.mine) {
+      const [cls, label, why] = tick(m);
+      const tk = el("span", "tick " + cls, label); tk.title = why;
+      if (m.status === "held") {
+        const s = el("button", null, "SEND"); s.type = "button"; s.onclick = () => outbox(m.id, "send");
+        const d = el("button", null, "DROP"); d.type = "button"; d.onclick = () => outbox(m.id, "drop");
+        tk.append(s, d);
+      }
+      head.append(tk);
+    }
+    r.append(head);
+    r.append(el("span", "txt", prec ? m.text.slice(pm[0].length) : m.text));   // label shows the precedence
+    r._m = m;
+    return fresh ? r : null;
+  }
+  const atBottom = () => { const L = $("log"); return L.scrollHeight - L.scrollTop - L.clientHeight < 40; };
+  function toBottom() { const L = $("log"); L.scrollTop = L.scrollHeight; unseen = 0; $("newbar").classList.add("hide"); }
+  $("log").addEventListener("scroll", () => { if (atBottom()) { unseen = 0; $("newbar").classList.add("hide"); } });
+  $("newbar").onclick = () => { toBottom(); $("text").focus(); };
+
+  async function poll() {
+    try {
+      const res = await fetch("/api/messages?after=" + seq, { cache: "no-store" });
+      if (!res.ok) throw new Error(res.status);
+      const d = await res.json();
+      fails = 0; $("banner").style.display = "none";
+      const stick = atBottom();
+      let incoming = 0;
+      for (const m of d.messages) {
+        const r = render(m);
+        const th = m.thread || "ALL";
+        if (th !== "ALL") {
+          const t = threads.get(th) || { name: m.mine ? (m.to || m.room) : m.from, unread: 0 };
+          if (!m.mine && t.name !== m.from) t.name = m.from;
+          if (r && loaded && !m.mine && th !== active) { t.unread++; hint("New direct message from " + m.from + "  ( /dm " + m.from + " )"); }
+          threads.set(th, t);
+        }
+        if (r) { $("log").append(r); if (loaded && !m.mine && th === active) incoming++; }
+      }
+      seq = d.seq;
+      renderTabs();
+      if (stick || !loaded) toBottom();
+      else if (incoming) { unseen += incoming; $("newbar").textContent = "▼ " + unseen + " NEW (End)"; $("newbar").classList.remove("hide"); }
+      if (!loaded) { loaded = true; recallList = mineTexts(); }
+    } catch (e) {
+      if (++fails >= 3) $("banner").style.display = "block";
+    }
+  }
+  function renderTabs() {
+    const bar = $("tabs");
+    const mk = (id, label, unread) => {
+      const b = el("button", id === active ? "on" : null, label); b.type = "button"; b.setAttribute("role", "tab");
+      if (unread) b.append(el("span", "badge", String(unread)));
+      if (id !== "ALL") { const x = el("span", "x", "×"); x.title = "close"; x.onclick = ev => { ev.stopPropagation(); threads.delete(id); if (active === id) show("ALL"); else renderTabs(); }; b.append(x); }
+      b.onclick = () => show(id);
+      return b;
+    };
+    bar.replaceChildren(mk("ALL", "ALL CHAT ROOMS", 0), ...[...threads.entries()].map(([id, t]) => mk(id, "DM " + t.name, t.unread)));
+  }
+  function show(id, name) {
+    if (id !== "ALL" && !threads.has(id)) threads.set(id, { name: name || id, unread: 0 });
+    active = id;
+    if (id !== "ALL") threads.get(id).unread = 0;
+    for (const r of rows.values()) r.classList.toggle("hidden", (r.dataset.thread || "ALL") !== active);
+    const t = threads.get(id);
+    $("text").placeholder = id === "ALL" ? "Message to All Chat Rooms  ( / for commands )" : "Direct message to " + t.name + "  ( Esc = back to All )";
+    $("who").textContent = "AS " + ((info && info.callsign) || "DECK") + " · " + (id === "ALL" ? "ALL CHAT ROOMS" : "DM " + t.name);
+    renderTabs(); toBottom(); $("text").focus();
+  }
+  function findContact(name) {
+    const n = String(name || "").toLowerCase();
+    return ((info && info.roster) || []).find(r => r.callsign.toLowerCase() === n || r.uid.toLowerCase() === n);
+  }
+  function openDM(r) {
+    if (!r.path) { hint("Can't DM " + r.callsign + " yet: no position report heard from them (they need to be on the mesh or the server).", "err"); return; }
+    show(r.uid, r.callsign);
+  }
+  const mineTexts = () => [...rows.values()].map(r => r._m).filter(m => m && m.mine && m.status !== "dropped").map(m => m.text);
+
+  // ---------- status, roster
+  function pill(id, cls, text, title) { const p = $(id); p.className = "pill " + cls; p.textContent = text; if (title) p.title = title; }
+  function ago(sec) { sec = Math.max(0, Math.round(sec)); return sec < 60 ? sec + "s" : Math.round(sec / 60) + "m"; }
+  async function getInfo() {
+    try {
+      const res = await fetch("/api/info", { cache: "no-store" });
+      info = await res.json();
+      $("who").textContent = "AS " + info.callsign + " · " + (active === "ALL" ? "ALL CHAT ROOMS" : "DM " + ((threads.get(active) || {}).name || ""));
+      if (!info.mesh_addr) pill("pmesh", "bad", "MESH DOWN", "No IP on " + info.mesh_iface + ". Node unplugged? Messages wait in the outbox.");
+      else if (info.mesh_direct || info.bridge.running) pill("pmesh", "ok", "MESH " + info.mesh_addr, "Listening on " + info.group);
+      else pill("pmesh", "warn", "MESH SEND ONLY", "Not listening: " + (info.mesh_error || "listener not started") + "; bridge down too");
+      if (!info.bridge.running) pill("psrv", "bad", "SERVER: BRIDGE DOWN", "Mesh chat still works; people on the server won't see it.");
+      else if (info.bridge_copy.listening === false) pill("psrv", "warn", "SERVER: NO COPY PORT", "Port for bridge copies is busy");
+      else pill("psrv", "ok", "SERVER RELAY", "Bridge running");
+      const ob = info.outbox || { waiting: 0, held: 0 };
+      if (ob.waiting) pill("pout", ob.held ? "bad" : "warn", "OUTBOX " + ob.waiting + (ob.held ? " (" + ob.held + " HELD)" : ""), "Waiting for the mesh. Held = waited too long; SEND or DROP it in the list.");
+      else $("pout").className = "pill hide";
+      $("rtitle").textContent = "ON NET · " + info.roster.length + "  (" + info.roster_minutes + " MIN)";
+      const now = Date.now() / 1000;
+      $("rlist").replaceChildren(...info.roster.map(r => {
+        const d = el("div", "r" + (r.src === "server" ? " srv" : "") + (r.path ? "" : " nodm"));
+        d.title = r.callsign + " · " + (r.src === "server" ? "via server" : "heard on the mesh") + " · " + r.uid +
+          (r.path ? "\nClick to send a direct message (" + (r.path === "mesh" ? "straight over the mesh" : "through the server") + ")" : "\nNo position report yet, so no DM route");
+        const left = el("span", "cs"); left.append(el("span", "name", r.callsign));
+        if (r.path) left.append(el("span", "dm", r.path === "mesh" ? "DM·mesh" : "DM·srv"));
+        d.append(left, el("span", "age", ago(now - r.last)));
+        d.onclick = () => openDM(r);
+        return d;
+      }));
+      if (!$("quick").childElementCount && info.quick) {
+        info.quick.slice(0, 9).forEach((q, i) => {
+          const b = el("button"); b.type = "button";
+          b.append(el("kbd", null, "F" + (i + 1)), document.createTextNode(q));
+          b.onclick = () => quick(i);
+          $("quick").append(b);
+        });
+      }
+      for (const r of rows.values()) if (r._m && r._m.mine && !r._m.relayed) render(r._m);
+    } catch (e) {}
+  }
+
+  // ---------- sending
+  function hint(text, cls) { const h = $("hint"); h.className = cls || ""; h.textContent = text || ""; }
+  async function post(url, body) {
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "X-Deck": "1" }, body: JSON.stringify(body) });
+    const d = await res.json().catch(() => ({}));
+    if (!d.ok) throw new Error(d.error || ("HTTP " + res.status));
+    return d;
+  }
+  async function send(text) {
+    const body = { text };
+    if (active !== "ALL") body.to = active;
+    const d = await post("/api/send", body);
+    if (d.status === "queued") hint("Queued: " + (d.note || "path down") + ". It goes out when the path is back.", "err");
+    else hint("");
+    recallList.push(text); recallIdx = -1;
+    poll(); toBottom();
+    return d;
+  }
+  async function outbox(id, action) {
+    try { await post("/api/outbox", { id, action }); poll(); getInfo(); } catch (e) { hint("Outbox: " + e.message, "err"); }
+  }
+  function quick(i) {
+    const q = info && info.quick && info.quick[i];
+    if (!q) return;
+    const t = $("text"), cur = t.value.trim();
+    t.value = (!cur || (info.quick || []).includes(cur)) ? q : cur + " " + q;
+    t.focus(); t.setSelectionRange(t.value.length, t.value.length);
+  }
+
+  // ---------- commands
+  const CMDS = [
+    ["/salute", "SALUTE report form"], ["/9line", "9-line MEDEVAC form"], ["/sitrep", "SITREP form"], ["/lace", "LACE report form"],
+    ["/flash", "<text>  send with FLASH precedence"], ["/immediate", "<text>  send with IMMEDIATE precedence"], ["/priority", "<text>  send with PRIORITY precedence"],
+    ["/z", "toggle Zulu / local time"], ["/roster", "show or hide who's on net"], ["/export", "save the chat log as a text file (Zulu times)"],
+    ["/dm", "<name> [text]  open a direct message (or click a name)"], ["/all", "back to All Chat Rooms (or Esc)"],
+    ["/help", "this list"]
+  ];
+  function helpText() {
+    const h = $("hint"); h.className = "help"; h.replaceChildren();
+    const lines = [["Enter", "send"], ["Up / Down", "recall your earlier messages"], ["F1-F9", "quick phrases"], ["Esc", "clear / close"], ["Tab", "complete a /command"], ["PgUp / PgDn / End", "scroll, End = newest"]];
+    h.append(el("span", null, "KEYS\n"));
+    for (const [k, v] of lines) { h.append(el("span", "k", ("  " + k).padEnd(20))); h.append(document.createTextNode(v + "\n")); }
+    h.append(el("span", null, "\nCOMMANDS\n"));
+    for (const [k, v] of CMDS) { h.append(el("span", "k", ("  " + k).padEnd(20))); h.append(document.createTextNode(v + "\n")); }
+    h.append(document.createTextNode("\nBars: green = mesh, blue = server, amber = you.  ✓ = on the mesh, ✓✓ = relayed to the server.\nDMs: click a name in ON NET, or /dm NAME. In a DM, ✓✓ = delivered to their phone over the mesh, ✓ = handed to the server. Esc = back to All."));
+  }
+  async function command(raw) {
+    const m = /^\/(\S+)\s*([\s\S]*)$/.exec(raw.trim());
+    const c = m ? m[1].toLowerCase() : "", arg = m ? m[2].trim() : "";
+    if (["flash", "immediate", "priority"].includes(c)) {
+      if (!arg) { hint("Usage: /" + c + " <message>", "err"); return false; }
+      await send(c.toUpperCase() + ": " + arg); return true;
+    }
+    switch (c) {
+      case "help": case "?": helpText(); return true;
+      case "all": show("ALL"); hint(""); return true;
+      case "dm": {
+        const mm = /^(\S+)\s*([\s\S]*)$/.exec(arg);
+        if (!mm) { hint("Usage: /dm <callsign> [message]", "err"); return false; }
+        const r = findContact(mm[1]);
+        if (!r) { hint("No contact called " + mm[1] + " on the roster.", "err"); return false; }
+        if (!r.path) { openDM(r); return false; }
+        show(r.uid, r.callsign); hint("");
+        if (mm[2].trim()) await send(mm[2].trim());
+        return true;
+      }
+      case "z": case "zulu": toggleZulu(); hint("Times now " + (zulu ? "Zulu (UTC)" : "local")); return true;
+      case "roster": document.body.classList.toggle("showroster"); hint(window.innerWidth >= 900 ? "The roster is the panel on the right." : ""); return true;
+      case "export": window.location.href = "/api/export"; hint("Log saved to your Downloads folder."); return true;
+      case "salute": case "9line": case "medevac": case "sitrep": case "lace": openForm(c === "medevac" ? "9line" : c); return true;
+    }
+    hint("Unknown command /" + c + ". Type /help for the list.", "err"); return false;
+  }
+
+  // ---------- report forms
+  const FORMS = {
+    salute: { title: "SALUTE REPORT", head: "SALUTE", fields: [
+      ["S", "Size", "number of people / vehicles"], ["A", "Activity", "what they are doing"], ["L", "Location", "grid or reference"],
+      ["U", "Unit / uniform", "markings, clothing"], ["T", "Time", "", () => dtgZ(new Date())], ["E", "Equipment", "weapons, vehicles, gear"]] },
+    "9line": { title: "9-LINE MEDEVAC", head: "9-LINE MEDEVAC", all: true, fields: [
+      ["1", "Pickup location", "grid"], ["2", "Freq / callsign", "radio freq, callsign"],
+      ["3", "Patients by precedence", "A urgent, B urgent-surg, C priority, D routine, E convenience"],
+      ["4", "Special equipment", "A none, B hoist, C extraction, D ventilator"], ["5", "Patients by type", "L litter, A ambulatory"],
+      ["6", "Security at PZ", "N no enemy, P possible, E enemy, X armed escort"], ["7", "Marking", "A panels, B pyro, C smoke, D none, E other"],
+      ["8", "Nationality / status", "A US mil, B US civ, C non-US mil, D non-US civ, E EPW"], ["9", "NBC / terrain", "N, B, C or terrain description"]] },
+    sitrep: { title: "SITREP", head: "SITREP", fields: [
+      ["DTG", "Date-time group", "", () => dtgZ(new Date())], ["UNIT", "Unit / callsign", "", () => (info && info.callsign) || ""], ["LOC", "Location", "grid or reference"],
+      ["ACT", "Activity", "what you are doing"], ["STATUS", "Status", "GREEN / AMBER / RED + note"], ["REQ", "Requests", "support needed"]] },
+    lace: { title: "LACE REPORT", head: "LACE", fields: [
+      ["L", "Liquids", "GREEN / AMBER / RED / BLACK"], ["A", "Ammo", "GREEN / AMBER / RED / BLACK"],
+      ["C", "Casualties", "number, status"], ["E", "Equipment", "GREEN / AMBER / RED / BLACK + note"]] }
+  };
+  let formKey = null;
+  function formText() {
+    const f = FORMS[formKey], box = $("mbox");
+    const prec = box.querySelector("#fprec").value;
+    const lines = [];
+    f.fields.forEach(([code], i) => {
+      const v = box.querySelector("#ff" + i).value.trim();
+      if (v || f.all) lines.push(code + ": " + (v || "-"));
+    });
+    return { text: (prec !== "ROUTINE" ? prec + ": " : "") + f.head + "\n" + lines.join("\n"), any: lines.some(l => !/: -$/.test(l)) };
+  }
+  function openForm(key) {
+    formKey = key;
+    const f = FORMS[key], box = $("mbox");
+    box.replaceChildren();
+    const h = el("h2"); h.id = "mtitle"; h.append(document.createTextNode(f.title), el("small", null, "Enter = next field · Ctrl+Enter = send · Esc = cancel"));
+    box.append(h);
+    const prow = el("div", "row"); const pl = el("label", null, "Precedence"); pl.htmlFor = "fprec";
+    const ps = el("select"); ps.id = "fprec";
+    for (const p of ["ROUTINE", "PRIORITY", "IMMEDIATE", "FLASH"]) { const o = el("option", null, p); o.value = p; ps.append(o); }
+    prow.append(pl, ps); box.append(prow);
+    f.fields.forEach(([code, label, ph, def], i) => {
+      const row = el("div", "row"); const l = el("label", null, code + "  " + label); l.htmlFor = "ff" + i;
+      const inp = el("input"); inp.id = "ff" + i; inp.placeholder = ph || ""; inp.maxLength = 120; inp.autocomplete = "off";
+      if (def) inp.value = def();
+      row.append(l, inp); box.append(row);
+    });
+    const pre = el("pre"); pre.id = "fprev"; box.append(pre);
+    const acts = el("div", "acts"); const err = el("span"); err.id = "ferr";
+    const cancel = el("button", "tbtn", "CANCEL (Esc)"); cancel.type = "button"; cancel.onclick = closeForm;
+    const sendb = el("button", null, "SEND (Ctrl+Enter)"); sendb.type = "button"; sendb.id = "fsend";
+    sendb.style.cssText = "background:var(--g);color:var(--bg);border:0;padding:8px 16px;letter-spacing:.1em;cursor:pointer";
+    sendb.onclick = sendForm;
+    acts.append(err, cancel, sendb); box.append(acts);
+    const upd = () => { pre.textContent = formText().text; err.textContent = ""; };
+    box.oninput = upd; upd();
+    $("modal").classList.remove("hide");
+    hint("");
+    (box.querySelector("#ff0") || ps).focus();
+  }
+  function closeForm() { formKey = null; $("modal").classList.add("hide"); $("text").focus(); }
+  async function sendForm() {
+    const { text, any } = formText();
+    if (!any) { $("ferr").textContent = "Fill in at least one line first"; return; }
+    $("fsend").disabled = true;
+    try { await send(text); closeForm(); }
+    catch (e) { $("ferr").textContent = "Not sent: " + e.message; }
+    if ($("fsend")) $("fsend").disabled = false;
+  }
+  $("modal").addEventListener("keydown", ev => {
+    if (ev.key === "Escape") { ev.preventDefault(); closeForm(); return; }
+    if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); sendForm(); return; }
+    if (ev.key === "Enter" && ev.target.tagName === "INPUT") {
+      ev.preventDefault();
+      const ins = [...$("mbox").querySelectorAll("input")], i = ins.indexOf(ev.target);
+      if (i < ins.length - 1) ins[i + 1].focus(); else $("fsend").focus();
+    }
+  });
+
+  // ---------- keyboard
+  let recallList = [], recallIdx = -1;
+  const input = $("text");
+  input.addEventListener("keydown", ev => {
+    if (ev.key === "ArrowUp" && (input.value === "" || recallIdx >= 0) && recallList.length) {
+      ev.preventDefault();
+      recallIdx = recallIdx < 0 ? recallList.length - 1 : Math.max(0, recallIdx - 1);
+      input.value = recallList[recallIdx];
+    } else if (ev.key === "ArrowDown" && recallIdx >= 0) {
+      ev.preventDefault();
+      recallIdx++;
+      if (recallIdx >= recallList.length) { recallIdx = -1; input.value = ""; } else input.value = recallList[recallIdx];
+    } else if (ev.key === "Tab" && input.value.startsWith("/") && !input.value.includes(" ")) {
+      ev.preventDefault();
+      const hit = CMDS.find(([c]) => c.startsWith(input.value.toLowerCase()));
+      if (hit) input.value = hit[0] + " ";
+    }
+  });
+  input.addEventListener("input", () => {
+    recallIdx = -1;
+    const v = input.value;
+    if (v.startsWith("/") && !v.includes(" ")) {
+      const hits = CMDS.filter(([c]) => c.startsWith(v.toLowerCase())).map(([c]) => c);
+      hint(hits.length ? hits.join("  ") + "   (Tab completes)" : "no such command (/help)", hits.length ? "" : "err");
+    } else if ($("hint").className !== "help") hint("");
+  });
+  document.addEventListener("keydown", ev => {
+    if (formKey) return;
+    const fm = /^F([1-9])$/.exec(ev.key);
+    if (fm && !ev.ctrlKey && !ev.altKey) { ev.preventDefault(); quick(+fm[1] - 1); return; }
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      if (input.value) { input.value = ""; recallIdx = -1; }
+      else if (active !== "ALL") { show("ALL"); }
+      document.body.classList.remove("showroster");
+      hint(""); input.focus(); return;
+    }
+    const L = $("log");
+    if (ev.key === "PageUp") { ev.preventDefault(); L.scrollTop -= L.clientHeight * 0.85; return; }
+    if (ev.key === "PageDown") { ev.preventDefault(); L.scrollTop += L.clientHeight * 0.85; return; }
+    if (ev.key === "End" && (document.activeElement !== input || !input.value)) { ev.preventDefault(); toBottom(); return; }
+    if (document.activeElement !== input && ev.key.length === 1 && !ev.ctrlKey && !ev.altKey && !ev.metaKey) input.focus();
+  });
+
+  $("f").addEventListener("submit", async ev => {
+    ev.preventDefault();
+    const t = input.value.trim();
+    if (!t) { hint("Type a message first", "err"); return; }
+    $("sendb").disabled = true;
+    try {
+      const ok = t.startsWith("/") ? await command(t) : (await send(t), true);
+      if (ok) input.value = "";
+    } catch (e) { hint("Not sent: " + e.message, "err"); }
+    $("sendb").disabled = false; if (!formKey) input.focus();
+  });
+
+  input.focus();
+  getInfo(); poll();
+  setInterval(poll, 1500);
+  setInterval(getInfo, 5000);
+  // VOICE tab: a dot while someone is talking on a talk group (from manet-voice, if it runs)
+  const voiceDot = () => fetch("/api/voice", { cache: "no-store" }).then(r => r.json()).then(v => {
+    const on = !!(v.running && (v.groups || []).some(g => g.talking));
+    $("vdot").classList.toggle("hide", !on);
+  }).catch(() => {});
+  voiceDot(); setInterval(voiceDot, 2000);
+})();
+</script>
+</body>
+</html>

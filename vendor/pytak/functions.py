@@ -1,0 +1,594 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# functions.py from https://github.com/snstac/pytak
+#
+# Copyright Sensors & Signals LLC https://www.snstac.com
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+"""PyTAK Functions."""
+
+import datetime
+from decimal import Decimal, ROUND_DOWN
+import warnings
+import xml.etree.ElementTree as ET
+import secrets
+import tempfile
+import zipfile
+import os
+
+import json
+
+from pathlib import Path
+from typing import Iterable, Mapping, NamedTuple, Optional, Tuple, Union
+from urllib.parse import ParseResult, urlparse, unquote, urlunparse
+
+import pytak
+import pytak.crypto_classes  # pylint: disable=cyclic-import
+
+
+def truncate_float(value: Union[bytes, str, float, int], precision: int = 4) -> str:
+    """Return a numeric value truncated to no more than ``precision`` decimals."""
+    if precision < 0:
+        raise ValueError("precision must be greater than or equal to 0")
+
+    original = value.decode() if isinstance(value, bytes) else str(value)
+    decimal_value = Decimal(original)
+    quant = Decimal(1).scaleb(-precision)
+    truncated = decimal_value.quantize(quant, rounding=ROUND_DOWN)
+    text = format(truncated, f".{precision}f")
+
+    if precision:
+        text = text.rstrip("0").rstrip(".")
+        if "." not in text and any(marker in original.lower() for marker in (".", "e")):
+            text += ".0"
+
+    if text in ("-0", "-0.0"):
+        return "0.0" if "." in text else "0"
+    return text
+
+
+def split_host(host: str, port: Union[int, None] = None) -> Tuple[str, int]:
+    """Split a host:port string or host, port params into a host,port tuple."""
+    addr: str
+    _port: str
+    
+    if ":" in host:
+        addr, _port = host.split(":")
+        port = int(_port)
+    elif port:
+        addr = host
+        port = int(port)
+    else:
+        addr = host
+        port = int(pytak.DEFAULT_COT_PORT)
+    return addr, int(port)
+
+
+def parse_url(url: Union[str, ParseResult]) -> Tuple[str, int]:
+    """Parse a CoT destination URL."""
+    if isinstance(url, str):
+        _url: ParseResult = urlparse(url)
+    elif isinstance(url, ParseResult):
+        _url = url
+
+    assert isinstance(_url, ParseResult)
+
+    port: Union[int, str] = pytak.DEFAULT_BROADCAST_PORT
+    host: str = _url.netloc
+
+    if ":" in _url.netloc:
+        host, port = _url.netloc.rsplit(":", 1)
+    else:
+        if "broadcast" in _url.scheme:
+            port = pytak.DEFAULT_BROADCAST_PORT
+        elif "multicast" in _url.scheme:
+            warnings.warn(
+                "You no longer need to specify '+multicast' in the COT_URL.",
+                DeprecationWarning,
+            )
+            port = pytak.DEFAULT_BROADCAST_PORT
+        else:
+            port = pytak.DEFAULT_COT_PORT
+
+    return host, int(port)
+
+
+def parse_cot_scheme(scheme: str) -> Tuple[str, bool, bool]:
+    """Parse a COT_URL scheme into base scheme and direction modifiers.
+
+    Modifiers ``+wo`` (write-only) and ``+ro`` (read-only) may be appended to
+    transport schemes (e.g. ``tls+wo``, ``udp+ro``). They are mutually exclusive.
+
+    Parameters
+    ----------
+    scheme : `str`
+        URL scheme from ``urlparse().scheme`` (e.g. ``tls+wo``, ``marti+http``).
+
+    Returns
+    -------
+    `tuple`
+        ``(base_scheme, write_only, read_only)``
+    """
+    scheme = scheme.lower()
+    write_only = "+wo" in scheme
+    read_only = "+ro" in scheme
+    if write_only and read_only:
+        raise SyntaxError("COT_URL cannot specify both +wo and +ro modifiers")
+    base_scheme = scheme
+    for modifier in ("+wo", "+ro"):
+        base_scheme = base_scheme.replace(modifier, "")
+    return base_scheme, write_only, read_only
+
+
+class MqttUrlParts(NamedTuple):
+    """Parsed components of an mqtt:// or mqtts:// COT_URL."""
+
+    host: str
+    port: int
+    topic: str
+    username: Optional[str]
+    password: Optional[str]
+    use_tls: bool
+
+
+def parse_mqtt_url(url: Union[str, ParseResult]) -> MqttUrlParts:
+    """Parse an mqtt:// or mqtts:// COT_URL into connection components.
+
+    The MQTT topic is taken from the URL path (leading ``/`` stripped).
+    Username and password may appear in the URL netloc or via config keys.
+
+    Parameters
+    ----------
+    url : `Union[str, ParseResult]`
+        Full MQTT COT_URL.
+
+    Returns
+    -------
+    `MqttUrlParts`
+        Host, port, topic, credentials, and TLS flag.
+
+    Raises
+    ------
+    SyntaxError
+        If the URL scheme is not mqtt/mqtts or the topic path is empty.
+    """
+    if isinstance(url, str):
+        _url: ParseResult = urlparse(url)
+    else:
+        _url = url
+
+    assert isinstance(_url, ParseResult)
+
+    base_scheme, _, _ = parse_cot_scheme(_url.scheme.lower())
+    if base_scheme not in ("mqtt", "mqtts"):
+        raise SyntaxError(
+            f"parse_mqtt_url() requires mqtt:// or mqtts://, got scheme '{_url.scheme}'"
+        )
+
+    use_tls = base_scheme == "mqtts"
+    default_port = (
+        pytak.DEFAULT_MQTTS_PORT if use_tls else pytak.DEFAULT_MQTT_PORT
+    )
+
+    host = _url.hostname or ""
+    if not host:
+        raise SyntaxError("MQTT COT_URL must include a broker hostname")
+
+    port = _url.port if _url.port is not None else default_port
+
+    topic = _url.path.lstrip("/")
+    if not topic:
+        raise SyntaxError(
+            "MQTT COT_URL must include a topic in the URL path, "
+            "e.g. mqtt://broker.example.com:1883/cot"
+        )
+
+    username = unquote(_url.username) if _url.username else None
+    password = unquote(_url.password) if _url.password else None
+
+    return MqttUrlParts(
+        host=host,
+        port=port,
+        topic=topic,
+        username=username,
+        password=password,
+        use_tls=use_tls,
+    )
+
+
+def cot_time(cot_stale: Union[int, None] = None) -> str:
+    """Get the current UTC datetime as a W3C XML Schema dateTime primitive.
+
+    See: https://www.w3.org/TR/xmlschema-2/#dateTime
+
+    Parameters
+    ----------
+    cot_stale : `Union[int, None]`
+        Time in seconds to add to the current time, for use with Cursor on Target
+        'stale' attributes.
+
+    Returns
+    -------
+    `str`
+        Current UTC datetime in W3C XML Schema dateTime format.
+    """
+    time = datetime.datetime.now(datetime.timezone.utc)
+    if cot_stale:
+        time = time + datetime.timedelta(seconds=int(cot_stale))
+    return time.strftime(pytak.W3C_XML_DATETIME)
+
+
+def cot_flow_tags(host_id: Optional[str] = None) -> ET.Element:
+    """Return a standard CoT ``_flow-tags_`` detail element."""
+    flow_tags = ET.Element("_flow-tags_")
+    tag_host_id = (host_id or pytak.DEFAULT_HOST_ID).replace("@", "-")
+    flow_tags.set(f"{tag_host_id}-pytak", pytak.cot_time())
+    return flow_tags
+
+
+def cot_point(
+    lat: Union[bytes, str, float, int, None] = None,
+    lon: Union[bytes, str, float, int, None] = None,
+    ce: Union[bytes, str, float, int, None] = None,
+    hae: Union[bytes, str, float, int, None] = None,
+    le: Union[bytes, str, float, int, None] = None,
+    precision: int = 4,
+) -> ET.Element:
+    """Return a CoT ``point`` element with TAK-safe latitude and longitude."""
+    point = ET.Element("point")
+    point.set("lat", truncate_float(lat, precision) if lat is not None else "0.0")
+    point.set("lon", truncate_float(lon, precision) if lon is not None else "0.0")
+    point.set("hae", str(hae) if hae is not None else pytak.DEFAULT_COT_VAL)
+    point.set("ce", str(ce) if ce is not None else pytak.DEFAULT_COT_VAL)
+    point.set("le", str(le) if le is not None else pytak.DEFAULT_COT_VAL)
+    return point
+
+
+def cot_detail(
+    *children: ET.Element,
+    flow_tag: bool = True,
+    flow_tag_host_id: Optional[str] = None,
+) -> ET.Element:
+    """Return a CoT ``detail`` element with optional flow tags and children."""
+    detail = ET.Element("detail")
+    if flow_tag:
+        detail.append(cot_flow_tags(flow_tag_host_id))
+    for child in children:
+        detail.append(child)
+    return detail
+
+
+def remarks_text(
+    fields: Iterable[object],
+    separator: str = " ",
+    include_empty: bool = False,
+) -> str:
+    """Join remark fields after dropping ``None`` and, by default, empty values."""
+    values = []
+    for field in fields:
+        if field is None:
+            continue
+        value = str(field)
+        if not include_empty and not value.strip():
+            continue
+        values.append(value)
+    return separator.join(values)
+
+
+def add_remarks(
+    detail: ET.Element,
+    fields: Iterable[object],
+    separator: str = " ",
+    include_empty: bool = False,
+) -> ET.Element:
+    """Append a CoT ``remarks`` child to ``detail`` and return it."""
+    remarks = ET.Element("remarks")
+    remarks.text = remarks_text(fields, separator, include_empty)
+    detail.append(remarks)
+    return remarks
+
+
+def cot_event(
+    lat: Union[bytes, str, float, int, None] = None,
+    lon: Union[bytes, str, float, int, None] = None,
+    ce: Union[bytes, str, float, int, None] = None,
+    hae: Union[bytes, str, float, int, None] = None,
+    le: Union[bytes, str, float, int, None] = None,
+    uid: Optional[str] = None,
+    stale: Union[float, int, None] = None,
+    cot_type: Optional[str] = None,
+    how: str = "m-g",
+    point: Optional[ET.Element] = None,
+    detail: Optional[ET.Element] = None,
+    callsign: Optional[str] = None,
+    flow_tag: bool = True,
+    access: Optional[str] = None,
+    qos: Optional[str] = None,
+    opex: Optional[str] = None,
+    caveat: Optional[str] = None,
+    relto: Optional[str] = None,
+    extra_attrs: Optional[Mapping[str, object]] = None,
+) -> ET.Element:
+    """Return a standard CoT ``event`` element for PyTAK-based clients."""
+    stale_seconds = int(stale or pytak.DEFAULT_COT_STALE)
+    event = ET.Element("event")
+    event.set("version", "2.0")
+    event.set("type", cot_type or "a-u-G")
+    event.set("uid", uid or pytak.DEFAULT_HOST_ID)
+    event.set("how", how)
+    event.set("time", pytak.cot_time())
+    event.set("start", pytak.cot_time())
+    event.set("stale", pytak.cot_time(stale_seconds))
+
+    optional_attrs = {
+        "access": access,
+        "qos": qos,
+        "opex": opex,
+        "caveat": caveat,
+        "rel_to": relto,
+    }
+    for key, value in optional_attrs.items():
+        if value:
+            event.set(key, str(value))
+    for key, value in (extra_attrs or {}).items():
+        if value is not None:
+            event.set(str(key), str(value))
+
+    event.append(point if point is not None else cot_point(lat, lon, ce, hae, le))
+
+    event_detail = detail if detail is not None else cot_detail(flow_tag=flow_tag)
+    if callsign:
+        contact = ET.Element("contact")
+        contact.set("callsign", callsign)
+        event_detail.append(contact)
+    event.append(event_detail)
+    return event
+
+
+def serialize_cot(
+    event: ET.Element,
+    xml_declaration: bool = True,
+    trailing_newline: bool = False,
+) -> bytes:
+    """Serialize a CoT XML element to bytes."""
+    payload = ET.tostring(event)
+    if xml_declaration:
+        payload = pytak.DEFAULT_XML_DECLARATION + b"\n" + payload
+    if trailing_newline:
+        payload += b"\n"
+    return payload
+
+
+def sanitize_url_credentials(url: str) -> str:
+    """Return a URL with username/password removed from the netloc."""
+    if not url:
+        return ""
+    parsed = urlparse(url)
+    if parsed.username or parsed.password:
+        netloc = parsed.hostname or ""
+        if parsed.port:
+            netloc = f"{netloc}:{parsed.port}"
+        parsed = parsed._replace(netloc=netloc)
+    return urlunparse(parsed)
+
+
+def hello_event(uid: Optional[bytes] = None) -> bytes:
+    """Generate a Hello CoT Event."""
+    uid = uid or "takPing"
+    return gen_cot(uid=uid, cot_type="t-x-d-d")
+
+
+def unzip_file(zip_src: bytes, zip_dest: Union[bytes, None] = None) -> str:
+    """Unzips a given zip file, returning the destination path."""
+    _zip_dest: str = zip_dest or tempfile.mkdtemp(prefix="pytak_dp_")
+    with zipfile.ZipFile(zip_src, "r") as zip_ref:
+        zip_ref.extractall(_zip_dest)
+    assert os.path.exists(_zip_dest)
+    return _zip_dest
+
+
+def find_file(search_dir: str, glob: str) -> str:
+    """Find the first file for a given glob in the search directory."""
+    try:
+        files = list(Path(search_dir).rglob(glob))
+        assert len(files) > 0
+        return str(files[0])
+    except Exception as exc:
+        raise EOFError(f"Could not find file: {glob}") from exc
+
+
+def find_cert(search_dir: str, cert_path: str) -> str:
+    """Find a cert file within a search dir after extracting the basename."""
+    cert_file: str = os.path.basename(cert_path)
+    assert cert_file
+    return find_file(search_dir, cert_file)
+
+
+def load_preferences(pref_path: str, search_dir: str) -> dict:
+    """Load preferences file into a dict."""
+    with open(pref_path, "rb+") as pref_fd:
+        pref_data: bytes = pref_fd.read()
+
+    root: ET.Element = ET.fromstring(pref_data)
+    entries: list = root.findall(".//entry")
+
+    prefs: dict = {
+        "connect_string": None,
+        "client_password": None,
+        "certificate_location": None,
+    }
+
+    # Determine the COT URL, client certificate and password
+    for entry in entries:
+        if entry.attrib["key"] == "connectString0":
+            prefs["connect_string"] = entry.text
+        if entry.attrib["key"] == "clientPassword":
+            prefs["client_password"] = entry.text
+        if entry.attrib["key"] == "certificateLocation":
+            prefs["certificate_location"] = find_cert(search_dir, entry.text)
+
+    return prefs
+
+
+def connectString2url(conn_str: str) -> str:  # pylint: disable=invalid-name
+    """Convert a TAK-style connectString into a URL."""
+    uri_parts = conn_str.split(":")
+    return f"{uri_parts[2]}://{uri_parts[0]}:{uri_parts[1]}"
+
+
+def cot2xml(event: pytak.COTEvent) -> ET.Element:
+    """Generate a minimum COT Event as an XML object."""
+    # Optimized: Reduce redundant str() calls and or operations
+    lat = truncate_float(event.lat) if event.lat is not None else "0.0"
+    lon = truncate_float(event.lon) if event.lon is not None else "0.0"
+    uid = event.uid or pytak.DEFAULT_HOST_ID
+    stale = int(event.stale or pytak.DEFAULT_COT_STALE)
+    cot_type = event.cot_type or "a-u-G"
+    le = str(event.le) if event.le is not None else pytak.DEFAULT_COT_VAL
+    hae = str(event.hae) if event.hae is not None else pytak.DEFAULT_COT_VAL
+    ce = str(event.ce) if event.ce is not None else pytak.DEFAULT_COT_VAL
+
+    xevent = ET.Element("event")
+    xevent.set("version", "2.0")
+    xevent.set("type", cot_type)
+    xevent.set("uid", uid)
+    xevent.set("how", "m-g")
+    xevent.set("time", pytak.cot_time())
+    xevent.set("start", pytak.cot_time())
+    xevent.set("stale", pytak.cot_time(stale))
+
+    point = ET.Element("point")
+    point.set("lat", lat)
+    point.set("lon", lon)
+    point.set("le", le)
+    point.set("hae", hae)
+    point.set("ce", ce)
+
+    # Optimized: Pre-compute flow tag name once
+    flow_tags = ET.Element("_flow-tags_")
+    _ft_tag: str = f"{pytak.DEFAULT_HOST_ID}-pytak".replace("@", "-")
+    flow_tags.set(_ft_tag, pytak.cot_time())
+
+    detail = ET.Element("detail")
+    detail.append(flow_tags)
+
+    xevent.append(point)
+    xevent.append(detail)
+
+    return xevent
+
+
+def gen_cot_xml(
+    lat: Union[bytes, str, float, None] = None,
+    lon: Union[bytes, str, float, None] = None,
+    ce: Union[bytes, str, float, int, None] = None,
+    hae: Union[bytes, str, float, int, None] = None,
+    le: Union[bytes, str, float, int, None] = None,
+    uid: Union[str, None] = None,
+    stale: Union[float, int, None] = None,
+    cot_type: Union[str, None] = None,
+    callsign: Optional[str] = None,
+) -> Optional[ET.Element]:
+    """Generate a minimum CoT Event as an XML object."""
+    return cot_event(
+        lat=lat,
+        lon=lon,
+        ce=ce,
+        hae=hae,
+        le=le,
+        uid=uid,
+        stale=stale,
+        cot_type=cot_type,
+        callsign=callsign,
+    )
+
+
+def gen_cot(
+    lat: Union[bytes, float, None] = None,
+    lon: Union[bytes, float, None] = None,
+    ce: Union[bytes, float, int, None] = None,
+    hae: Union[bytes, float, int, None] = None,
+    le: Union[bytes, float, int, None] = None,
+    uid: Optional[str] = None,
+    stale: Union[float, int, None] = None,
+    cot_type: Optional[str] = None,
+    callsign: Optional[str] = None,
+) -> Optional[bytes]:
+    """Generate a minimum CoT Event as an XML string [gen_cot_xml() wrapper]."""
+    cot: Union[ET.Element, bytes, None] = gen_cot_xml(
+        lat, lon, ce, hae, le, uid, stale, cot_type, callsign
+    )
+    if isinstance(cot, ET.Element):
+        return serialize_cot(cot)
+    return cot
+
+
+def tak_pong() -> bytes:
+    """Generate a takPong CoT Event."""
+    event = ET.Element("event")
+    event.set("version", "2.0")
+    event.set("type", "t-x-d-d")
+    event.set("uid", "takPong")
+    event.set("how", "m-g")
+    
+    # Optimized: Compute time once and reuse
+    current_time: str = pytak.cot_time()
+    event.set("time", current_time)
+    event.set("start", current_time)
+    event.set("stale", pytak.cot_time(3600))
+    
+    return ET.tostring(event)
+
+
+async def enroll_tak(host: str, username: str, password: str, passphrase: Optional[str] = None) -> Tuple[str, str]:
+    enrollment = pytak.crypto_classes.CertificateEnrollment()
+    passphrase = secrets.token_urlsafe(pytak.DEFAULT_TLS_ENROLLMENT_CERT_PASSPHRASE_LENGTH) if passphrase is None else passphrase
+
+    # Create a temporary file to store the certificate
+    output_path = None
+    
+    # Use tempfile to create a temp file for the cert
+    with tempfile.NamedTemporaryFile(suffix=".p12", delete=False) as tmpfile:
+        output_path = tmpfile.name
+
+    await enrollment.begin_enrollment(
+        domain=host,
+        username=username,
+        password=password,
+        output_path=output_path,
+        passphrase=passphrase,
+        trust_all=True
+    )
+
+    return output_path, passphrase
+
+
+async def decode_response(response):
+    """
+    Decode the response from the server.
+    If the response is JSON, it will return a dictionary.
+    If the response is not JSON, it will return the text content.
+    """
+    try:
+        response_data = await response.json()
+    except Exception as json_error:
+        # If JSON parsing fails due to content-type, try parsing text as JSON
+        response_text = await response.text()
+        try:
+            response_data = json.loads(response_text)
+        except json.JSONDecodeError:
+            # If still fails, return the text content
+            response_data = response_text
+            print(f"Failed to decode JSON: {json_error}. Returning text content instead.")
+            print(f"Response text: {response_text}")
+    return response_data

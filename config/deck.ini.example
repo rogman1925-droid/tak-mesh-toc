@@ -1,0 +1,240 @@
+# TAK MESH TOC: the ONE config file for the deck (~/manet_mesh_bridge/deck.ini).
+# Each program reads its own section; everything in [deck] is shared by all of them.
+# After editing:  meshtoc restart        Check it:  meshtoc check
+# This file can hold server details, so it is readable by you only (mode 600).
+#
+# A NEW INSTALL needs two things set by you:
+#   1. [bridge] COT_URL and the three PYTAK_TLS_ certificate lines (your TAK server)
+#   2. [deck] MESH_ADDR, if the installer could not find this deck's address on the mesh port
+# Everything else works as it is.
+
+[deck]
+# Name other ATAK users see for the deck (on the mesh AND on the server)
+CALLSIGN = DECK
+# Stable ID for the deck. Blank = DECK-<hostname>. Bridge and chat always use the same one.
+UID =
+# This deck's IP on the network port that goes to the mesh node (NOT its Wi-Fi or VPN address).
+# The installer fills it in from eth0.
+MESH_ADDR = 10.41.0.50
+# Node unplugged or off? The deck runs server-only (Chat talks to the server; DECK shows on server maps)
+# and switches to mesh + server by itself when the node is plugged in.
+# The deck's map symbol (a CoT type). a-f-G-U-C = friendly ground unit (the blue box with "CBT")
+MAP_TYPE = a-f-G-U-C
+# The deck's ATAK team (a team dot instead of the military symbol). Keep a team set: iTAK only lists the deck as a
+# person you can message when it has one (blank = military symbol; ATAK still lists it, iTAK shows a marker).
+#   teams: White Yellow Orange Magenta Red Maroon Purple Dark Blue Blue Cyan Teal Green Dark Green Brown
+#   roles: Team Member, Team Lead, HQ, Sniper, Medic, Forward Observer, RTO, K9
+TEAM = Cyan
+ROLE = HQ
+# GPS puck through gpsd: DECK's live position on every map, the dashboard's GPS tile. off = no GPS.
+GPS = off
+GPS_HOST = 127.0.0.1:2947
+
+[bridge]
+# Your TAK server. TLS (recommended):  tls://<server address>:8089  plus the three certificate lines below.
+# Plain TCP (only on a network you trust):  tcp://<server address>:8088  and no certificate lines.
+COT_URL = tls://tak.example.net:8089
+# The deck's client certificate and key as PEM files (README, "Certificates", shows how to get them from the
+# data package your server gives you), and the server's CA certificate. Keep them readable by you only.
+# PYTAK_TLS_CLIENT_CERT = ~/certs/deck.pem
+# PYTAK_TLS_CLIENT_KEY = ~/certs/deck.key
+# PYTAK_TLS_CLIENT_CAFILE = ~/certs/ca.pem
+# Only if the key file has a password:
+# PYTAK_TLS_CLIENT_PASSWORD =
+# If the server's certificate doesn't name the address you use (common with a VPN IP):
+# PYTAK_TLS_DONT_CHECK_HOSTNAME = 1
+
+# Mesh side: ATAK SA multicast group, receive-only.
+MESH_URL = udp+ro://239.2.3.1:6969
+
+# Drop identical repeats seen within this many seconds.
+DEDUPE_SECONDS = 0.5
+
+# --- Return path: server people, chats and markers -> mesh phones ---
+RETURN_PATH = 1
+# Only these CoT type prefixes are sent (comma separated): friendly units, chat, markers, drawings.
+# RETURN_TYPES = a-f-,b-t-f,b-m-p,u-d-
+# Cap on events per second sent onto the HaLow mesh.
+# RETURN_MAX_PER_SEC = 5
+# RETURN_URL = udp://239.2.3.1:6969
+# RETURN_CHAT_URL = udp://224.10.10.1:17012
+# MESH_CHAT_URL = udp+ro://224.10.10.1:17012   (or off)
+
+# Status file read by the dashboard and `meshtoc check` (rewritten every 2 s). "off" disables it.
+# STATUS_FILE = ~/bridge_status.json
+
+# Copies of chat for TAK MESH TOC Chat on this deck (off by default). Needed by Chat.
+LOCAL_CHAT_COPY = udp://127.0.0.1:17013
+
+# --- Identity (on by default) ---
+# OpenTAKServer ties a connection to the first position report it sees on it. The bridge
+# introduces itself first so OTS always sets up delivery for it (otherwise a mesh device such
+# as OpenTAK ICU could "win" and OTS would send the bridge nothing).
+# IDENTIFY = 1
+# IDENTIFY_INTERVAL = 300           (seconds between repeats, minimum 30)
+# BRIDGE_VISIBLE = 0                (1 = show DECK on maps; set BRIDGE_LAT / BRIDGE_LON first)
+
+# Chat's direct messages to people on the server go through this local port (server only).
+# Needed by Chat.
+LOCAL_SEND = udp://127.0.0.1:17014
+
+# Private DMs between mesh phones and server phones (needs server/mesh_mailroute on an OpenTAKServer; README).
+# Server DMs for a mesh phone go only to that phone; mesh phones DM server people via the deck.
+# DM_RELAY_PORT: the deck's port for that (default 4243). DM_HOLD_SECONDS: how long a DM for a phone
+# not heard yet (e.g. right after a reboot) is held (default 180).
+# Turn on (1) after installing server/mesh_mailroute on your OpenTAKServer (README, "Direct messages").
+DM_RELAY = 0
+
+# GPS: put DECK's live position (from gpsd) in the bridge's report to the server, so DECK shows on
+# server phones' maps and moves with you. Set GPS in [deck].
+# GPS_INTERVAL = 15            (seconds between position updates while there is a fix)
+
+# --- Server link and traffic ---
+# The bridge pings the server (OTS answers ATAK pings) and reconnects if the answers stop, e.g. after a
+# cell or Tailscale dropout that never closed the connection. The round-trip time goes in the status file.
+# PING_INTERVAL = 20           (seconds; 0 = no pings)
+# LINK_TIMEOUT = 60            (seconds without an answer, or with sent data unacknowledged, before reconnecting)
+# Position reports going up to the server: at most one per phone this often, always the newest. Chats,
+# markers, alerts and DMs are never held. Saves uplink and OTS work; 0 = forward every report.
+# UP_MIN_INTERVAL = 3
+# Chats and DMs on their way to the server are kept on disk until the server has them, and sent again after a
+# lost link. OUTBOX_FILE = off disables it. At most OUTBOX_HOURS old and OUTBOX_MAX messages.
+# OUTBOX_FILE = ~/bridge_outbox.jsonl
+# OUTBOX_HOURS = 24
+# OUTBOX_MAX = 5000
+# DM route check: every DM_SELFTEST_INTERVAL s a test message to the made-up callsign DM_SELFTEST must come back
+# through the server helper (dashboard row "DM route"). DM_SELFTEST = off disables it.
+# DM_SELFTEST = DECK-selftest
+# DM_SELFTEST_INTERVAL = 60
+
+[chat]
+# ---- TAK MESH TOC Chat (was "Deck Chat"): ATAK chat, direct messages and the VOICE page on the deck's screen ----
+MESH_IFACE = eth0
+# ATAK's mesh chat group (same as the phones). Don't change unless ATAK's is changed
+CHAT_GROUP = 224.10.10.1:17012
+TTL = 1
+# Where the bridge sends chat copies (must match LOCAL_CHAT_COPY in [bridge])
+BRIDGE_COPY_LISTEN = 127.0.0.1:17013
+BRIDGE_STATUS_FILE = ~/bridge_status.json
+# Web page. Keep it on 127.0.0.1 (the deck's own screen only)
+LISTEN = 127.0.0.1:8090
+HISTORY_FILE = ~/deck_chat_log.jsonl
+HISTORY_KEEP = 300
+# Position reports, used for the ON NET roster ("off" to disable)
+SA_GROUP = 239.2.3.1:6969
+ROSTER_MINUTES = 10
+# Flood guard for the radio link
+MAX_SENDS_PER_10S = 6
+# Mesh down: messages wait in the outbox. Waiting longer than this = HELD until you press SEND or DROP
+OUTBOX_HOLD_SECONDS = 600
+# Position put on chat messages (0,0 = none). A GPS can fill this in later
+LAT = 0
+LON = 0
+# Quick buttons, separated by |
+QUICK = Radio check|Loud and clear|Roger|Copy|Wilco|Standby|Moving|Set|RTB
+# Direct messages: announce the deck on the mesh, accept DMs on TCP DM_PORT (eth0),
+# hand server DMs to the bridge on LOCAL_SEND (must match [bridge])
+SA_SEND = 1
+SA_INTERVAL = 60
+DM_PORT = 4242
+LOCAL_SEND = 127.0.0.1:17014
+# GPS (set in [deck]): with a fix, the deck's mesh position report and chat messages use it.
+SA_GPS_INTERVAL = 15
+
+[dashboard]
+# ---- TAK MESH TOC Ops: the status dashboard ----
+# Web page: http://<deck mesh-side IP>:8080  (and http://127.0.0.1:8080 on the deck itself)
+PORT = 8080
+# auto = 127.0.0.1 plus the address on MESH_IFACE (so it is NOT exposed on wlan0 or Tailscale).
+# Or give a list, e.g. 127.0.0.1,10.41.0.50   ("0.0.0.0" = every interface)
+LISTEN = auto
+MESH_IFACE = eth0
+MTU_EXPECTED = 1460
+
+# The bridge
+BRIDGE_STATUS_FILE = ~/bridge_status.json
+# Server host and port are read from COT_URL in [bridge]. Set these only to override.
+# SERVER_HOST = tak.example.net
+# SERVER_PORT = 8089
+
+# MediaMTX (video, optional and installed separately). The dashboard reads its status API (api: yes in mediamtx.yml).
+MEDIAMTX_API = http://127.0.0.1:9997
+MEDIAMTX_RTSP_PORT = 8554
+MEDIAMTX_WEBRTC_PORT = 8889
+MEDIAMTX_HLS_PORT = 8888
+# Stream path offered in the player when the API is unavailable
+DEFAULT_STREAM = live
+
+# The mesh nodes Ops pings to show the mesh link. List several, comma separated, with names in the same order:
+#   NODE_IP = 10.41.254.10, 10.41.254.20
+#   NODE_NAME = node 1, node 2
+# The link is OK when any of them answers. Blank NODE_IP = find the nodes on MESH_IFACE (the ones with a settings page).
+NODE_NAME = mesh node
+NODE_IP =
+
+EVENT_FILE = ~/dashboard_events.jsonl
+INTERNET_HOST = 1.1.1.1
+INTERNET_PORT = 443
+
+HISTORY_FILE = ~/dashboard_history.jsonl
+
+# ---- Alert rules: color only, no sound ----
+# Format:  metric  > or <  limit  [for SECONDS]  warn|bad  [tile]
+#   metrics: bridge_idle_min, cpu_temp, mem_pct, mesh_rtt, mesh_loss, server_rtt
+#   warn = amber, bad = red. tile = bridge, server, video or mesh (leave it off for a banner only)
+# With no ALERT_ lines these three defaults apply. Writing any ALERT_ line replaces all of them.
+# ALERT_1 = mesh_loss > 25 for 60 warn mesh
+# ALERT_2 = cpu_temp > 80 for 60 warn
+# ALERT_3 = mem_pct > 90 for 120 warn
+# ALERT_4 = bridge_idle_min > 5 bad bridge
+# ALERTS = off      (no rules at all)
+
+# ---- Controls ----
+# local = the Restart bridge button and the Snap button work from the deck's own screen only. off = strictly read-only.
+CONTROL = local
+CAPTURE_DIR = ~/dashboard_captures
+MIN_FREE_MB = 500
+# A live stream whose data stops for this many seconds shows as STALLED (amber). MediaMTX itself drops a silent
+# stream after about 10 s, after which it shows as ended.
+STALL_SECONDS = 4
+
+# GPS tile: uses GPS / GPS_HOST from [deck].
+# MGRS grid digits per axis: 5 = 10-digit (1 m), 4 = 8-digit (10 m), 3 = 6-digit (100 m)
+# MGRS_DIGITS = 5
+
+[voice]
+# ---- Voice: OpenMANET push-to-talk talk groups <-> Mumble channels (the manet-voice service) ----
+# Off by default. To turn it on:
+#   1. Each OpenMANET node: comms on (/etc/openmanetd/config.yml  comms: enable: true, controlSource: web)
+#   2. The node's eth0 must be in the mesh bridge, or the deck never hears the talk groups (see README, Voice)
+#   3. A Mumble server on your TAK server, reached over Tailscale, with one channel per bridged talk group:
+#        python3 ~/manet_mesh_bridge/current/voice/make_channel.py TG1 <server> 64738
+#   4. Fill in MUMBLE, MUMBLE_PASSWORD and MUMBLE_CERT_SHA256 below, set VOICE = on, then: meshtoc restart
+# ATAK phones on the mesh use the VX plugin: Multicast 239.192.41.1:38801, RTP, Network = wlan0 (not Auto).
+VOICE = off
+# Talk groups bridged to Mumble from the start: port:channel, comma separated. TG1 = 38801, TG2 = 38803,
+# TG3 = 38805, TG4 = 38807, TG5 = 38809. Every talk group is watched on the Voice page, and any of them can be
+# switched on or off there (BRIDGE TO MUMBLE, on the deck's own screen). A switched-on talk group uses the Mumble
+# channel of its own name (TG3 -> "TG3"). The switches are remembered in BRIDGE_STATE_FILE and win over this line.
+#   TALKGROUPS = 38801:TG1, 38803:TG2
+TALKGROUPS = 38801:TG1
+# The Mumble server, normally its Tailscale address. Mumble's default port is 64738.
+MUMBLE = 100.64.0.9:64738
+MUMBLE_USER = DECK-voice
+# The Mumble server password (serverpassword in mumble-server.ini). Blank = none.
+MUMBLE_PASSWORD =
+# The server certificate's SHA-256 (64 hex). meshtoc check prints the server's so you can paste it.
+# Blank = not checked (works, but anyone who can get in the middle could listen).
+MUMBLE_CERT_SHA256 =
+# Talk group address and ports (OpenMANET's, rarely changed). MESH_ADDR comes from [deck].
+# MESH_GROUP = 239.192.41.1
+# MESH_PORTS = 38801,38803,38805,38807,38809
+# Opus RTP payload types accepted from the mesh: 111 OpenMANET, 0 the ATAK VX plugin
+# MESH_PAYLOAD_TYPES = 111,0
+# One talker per talk group: the channel frees up after this much silence; nobody holds it longer than MAX_TALK_S
+# HANG_MS = 300
+# MAX_TALK_S = 60
+# STATUS_FILE = ~/voice_status.json
+# BRIDGE_STATE_FILE = ~/voice_bridges.json
+# Chat talks to the voice service here (LISTEN ON DECK, the bridge switches). Loopback only. off = neither.
+# CONTROL = 127.0.0.1:17016

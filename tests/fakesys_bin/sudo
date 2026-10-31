@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# fake sudo: run as the same user; /etc and /usr/local paths go into $FAKESYS
+args=()
+skip=0
+for x in "$@"; do if [ $skip = 1 ]; then skip=0; continue; fi; case "$x" in -o|-g) skip=1; continue;; /etc/*|/usr/local/*) args+=("$FAKESYS$x"); mkdir -p "$(dirname "$FAKESYS$x")";; *) args+=("$x");; esac; done
+case "${args[0]}" in apt-get|apt) echo "   (fake sudo: skipped ${args[*]})"; exit 0;; visudo) exit 0;; esac
+exec "${args[@]}"

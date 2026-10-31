@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0c1117">
+<title>TAK MESH TOC · Setup</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+/* TAK MESH TOC first-run setup. The Ops look: slate, Barlow Condensed headings, IBM Plex Sans text, IBM Plex Mono data,
+   green only for "ok", steel blue for what is selected. */
+@font-face { font-family: "Barlow Condensed"; font-weight: 600; src: url(/fonts/barlow-condensed-600.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; src: url(/fonts/barlow-condensed-700.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 400; src: url(/fonts/ibm-plex-mono-400.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 400; src: url(/fonts/ibm-plex-sans-400.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 600; src: url(/fonts/ibm-plex-sans-600.woff2) format("woff2"); font-display: swap; }
+:root { color-scheme: dark; --bg: #0c1117; --panel: #121921; --line: #222c37; --line2: #2b3846; --g: #e3e8ee; --dim: #93a1b0;
+  --ok: #4cc38a; --acc: #6ea8d8; --amber: #e3a33b; --red: #f06a63; --tint: rgba(110,168,216,.10);
+  --mono: "IBM Plex Mono", ui-monospace, "DejaVu Sans Mono", monospace; --sans: "IBM Plex Sans", system-ui, "DejaVu Sans", sans-serif;
+  --cond: "Barlow Condensed", "Arial Narrow", "DejaVu Sans Condensed", sans-serif; }
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--g); font: 15px/1.45 var(--sans); }
+.app { display: flex; flex-direction: column; height: 100%; }
+header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 24px; border-bottom: 1px solid var(--line2); }
+h1 { margin: 0; display: flex; align-items: center; gap: 10px; font: 700 22px var(--cond); letter-spacing: .14em; white-space: nowrap; }
+h1 .sub, .stepof { color: var(--dim); font-weight: 600; }
+.stepof { font: 600 15px var(--cond); letter-spacing: .14em; }
+.body { display: flex; flex: 1; min-height: 0; }
+nav { width: 210px; flex: none; border-right: 1px solid var(--line); padding: 20px 0; }
+nav div { padding: 9px 22px; color: var(--dim); font-size: 14px; border-left: 3px solid transparent; }
+nav div.on { color: var(--g); background: var(--tint); border-left-color: var(--acc); }
+nav div.done::before { content: "\2713  "; color: var(--ok); }
+main { flex: 1; min-width: 0; overflow: auto; padding: 26px 36px; }
+h2 { margin: 0 0 6px; font: 700 30px var(--cond); letter-spacing: .06em; }
+.lead { margin: 0 0 18px; color: var(--dim); max-width: 760px; }
+.box { border: 1px solid var(--line); background: var(--panel); margin: 0 0 16px; }
+.row { display: grid; grid-template-columns: 76px 220px minmax(0, 1fr); gap: 14px; padding: 10px 18px; border-bottom: 1px solid var(--line); align-items: baseline; }
+.row:last-child { border-bottom: 0; }
+.row .k { color: var(--dim); }
+.tag { font: 13px var(--mono); }
+.lv-ok { color: var(--ok); } .lv-warn { color: var(--amber); } .lv-bad { color: var(--red); } .lv-info { color: var(--dim); }
+.kv { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 14px; padding: 10px 18px; border-bottom: 1px solid var(--line); }
+.kv:last-child { border-bottom: 0; } .kv span:first-child { color: var(--dim); }
+#plan .kv { grid-template-columns: 320px minmax(0, 1fr); }
+.mono { font-family: var(--mono); font-size: 14px; }
+button, .btn { font: 700 15px var(--cond); letter-spacing: .12em; text-transform: uppercase; min-height: 44px; padding: 0 22px;
+  background: transparent; color: var(--dim); border: 1px solid var(--line2); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+button.pri, .btn.pri { background: var(--acc); color: var(--bg); border-color: var(--acc); }
+button.acc { color: var(--acc); border-color: var(--acc); }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, label:focus-within { outline: 2px solid var(--acc); outline-offset: 2px; }
+input[type=text], input[type=password], input[type=number], select { font: 15px var(--mono); color: var(--g); background: var(--panel);
+  border: 1px solid var(--line2); height: 44px; padding: 0 12px; }
+label.f { display: flex; flex-direction: column; gap: 6px; color: var(--dim); font-size: 14px; }
+.line { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin: 0 0 16px; }
+.drop { border: 1px dashed var(--line2); background: var(--panel); padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 0 0 16px; flex-wrap: wrap; }
+.drop .big { font-size: 16px; } .drop .small { color: var(--dim); font-size: 14px; }
+.opt { display: grid; grid-template-columns: 36px 220px minmax(0, 1fr); gap: 12px; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.opt:last-child { border-bottom: 0; } .opt.sel { background: var(--tint); }
+.opt input { width: 20px; height: 20px; accent-color: var(--acc); }
+.opt .d { color: var(--dim); }
+.swatches { display: grid; grid-template-columns: repeat(7, 44px); gap: 8px; }
+.swatches button { width: 44px; height: 44px; padding: 0; border: 1px solid var(--line2); }
+.swatches button[aria-pressed="true"] { outline: 3px solid var(--acc); outline-offset: 2px; }
+.msg { margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--line2); background: var(--panel); }
+.msg.bad { border-color: var(--red); color: var(--red); } .msg.ok { border-color: var(--ok); }
+code.cmd { display: block; font: 14px var(--mono); background: var(--panel); border: 1px solid var(--line); padding: 12px 14px; overflow-wrap: anywhere; color: var(--g); }
+.note { color: var(--dim); font-size: 14px; max-width: 760px; }
+footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 24px; border-top: 1px solid var(--line2); }
+.hidden { display: none !important; }
+@media (max-width: 760px) {
+  nav { display: none; } main { padding: 18px 16px; } header { padding: 10px 16px; } footer { padding: 10px 16px; }
+  .row, .kv, .opt { grid-template-columns: 1fr; gap: 4px; } h1 .sub { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><img src="/icon.svg" alt="" width="26" height="26">TAK MESH TOC <span class="sub">// SETUP</span></h1>
+    <div style="display:flex;align-items:center;gap:16px"><div class="stepof" id="stepof">STEP 1 OF 7</div>
+      <a class="btn" id="skip" href="/" style="min-height:36px;padding:0 14px">SKIP TO OPS</a></div>
+  </header>
+  <div class="body">
+    <nav aria-label="Setup steps" id="nav">
+      <div>1 Check the deck</div><div>2 Server</div><div>3 Mesh</div><div>4 Identity</div><div>5 Features</div><div>6 Server helper</div><div>7 Finish</div>
+    </nav>
+    <main id="main">
+      <section data-step="1">
+        <h2>Checking this deck</h2>
+        <p class="lead">Nothing is changed until the last step. Anything amber can be fixed later; red needs fixing first.</p>
+        <div class="box" id="facts"><div class="row"><span class="tag lv-info">[ .. ]</span><span>Checking</span><span></span></div></div>
+      </section>
+
+      <section data-step="2" class="hidden">
+        <h2>Connect to your TAK server</h2>
+        <p class="lead">Use the data package (.zip) OpenTAKServer gives you for a device, the same one you would import into ATAK.
+          Make a separate one for each deck. The setup reads the server address and the certificates from it.</p>
+        <div class="drop">
+          <div><div class="big" id="pkgname">No data package chosen yet</div><div class="small" id="pkgnote">Download it from OpenTAKServer on this deck, or copy it over with a USB stick.</div></div>
+          <label class="btn acc" for="pkgfile">CHOOSE DATA PACKAGE</label>
+          <input type="file" id="pkgfile" accept=".zip,application/zip" class="hidden">
+        </div>
+        <div id="pwbox" class="line hidden">
+          <label class="f" for="pw">Certificate password<input type="password" id="pw" autocomplete="off"></label>
+          <button type="button" class="acc" id="unlock">UNLOCK</button>
+        </div>
+        <div id="pkgerr" class="msg bad hidden" role="alert"></div>
+        <div id="pkginfo" class="hidden">
+          <div class="box" id="pkgrows"></div>
+          <div class="line">
+            <label class="f" for="host">Server address<input type="text" id="host" size="28" spellcheck="false"></label>
+            <label class="f" for="port">Port<input type="number" id="port" min="1" max="65535" style="width:110px"></label>
+            <button type="button" class="acc" id="test">TEST CONNECTION</button>
+          </div>
+          <div id="testres" class="msg hidden" role="status"></div>
+          <p class="note">Reaching the server over Tailscale or another VPN? Use its VPN address (tailscale status shows it).</p>
+        </div>
+      </section>
+
+      <section data-step="3" class="hidden">
+        <h2>Which port is the mesh on?</h2>
+        <p class="lead">The mesh port is the cable to a mesh node. Internet stays on the other one. No node right now? Choose Later:
+          the deck works with the server only, and you can run setup again when a node is plugged in.</p>
+        <fieldset class="box" id="ifaces" style="margin:0 0 16px;padding:0"><legend class="hidden">Mesh port</legend></fieldset>
+      </section>
+
+      <section data-step="4" class="hidden">
+        <h2>How phones see this deck</h2>
+        <p class="lead">The callsign and team other TAK users see, on the mesh and on the server.</p>
+        <div class="line"><label class="f" for="cs">Callsign<input type="text" id="cs" maxlength="32" size="20" spellcheck="false"></label></div>
+        <div class="f" style="margin:0 0 16px"><span id="teamlbl">Team colour: <b id="teamname"></b></span>
+          <div class="swatches" role="group" aria-labelledby="teamlbl" id="swatches"></div></div>
+        <div class="line"><label class="f" for="role">Role<select id="role"></select></label></div>
+        <p class="note">iTAK lists the deck as a contact only when it has a team and role.</p>
+      </section>
+
+      <section data-step="5" class="hidden">
+        <h2>What should the deck do?</h2>
+        <p class="lead">The recommended choices are set. Every one can be changed later in deck.ini.</p>
+        <div class="box">
+          <label class="opt"><input type="checkbox" checked disabled><span>Relay mesh and server</span><span class="d">positions, markers and chat, always on</span></label>
+          <label class="opt"><input type="checkbox" id="f-return"><span>Show server people on the mesh</span><span class="d">mesh phones see who is on the server</span></label>
+          <label class="opt"><input type="checkbox" id="f-dm"><span>Direct messages across</span><span class="d">needs the small server helper (next step). One deck per server.</span></label>
+          <label class="opt"><input type="checkbox" checked disabled><span>Keep chats if the link drops</span><span class="d">held on disk, sent when the server is back</span></label>
+          <label class="opt"><input type="checkbox" id="f-gps"><span>Deck position from GPS</span><span class="d" id="gpsnote">uses gpsd</span></label>
+        </div>
+        <fieldset class="box" style="margin:0 0 16px;padding:0">
+          <legend class="note" style="padding:0 8px">Who can open Ops</legend>
+          <label class="opt"><input type="radio" name="ops" id="ops-local"><span>This deck only</span><span class="d">recommended</span></label>
+          <label class="opt"><input type="radio" name="ops" id="ops-mesh"><span>Any device on the mesh</span><span class="d">read-only; they see the deck's position and server address</span></label>
+        </fieldset>
+        <p class="note">Push-to-talk voice and video are set up separately: see the README's Voice section.</p>
+      </section>
+
+      <section data-step="6" class="hidden">
+        <h2>Let server phones DM mesh phones</h2>
+        <div id="helper-off"><p class="lead">Direct messages across are off, so there is nothing to install on the server. Press Next.</p></div>
+        <div id="helper-on" class="hidden">
+          <p class="lead">One small helper runs on your OpenTAKServer. You install it yourself: this deck never logs in to your server.</p>
+          <p>1. Download the helper. It is already set up for <b class="mono" id="h-uid"></b>.</p>
+          <p><a class="btn acc" id="h-dl" href="/api/setup/helper.zip">DOWNLOAD THE HELPER</a></p>
+          <p>2. Copy it to the server's home folder, then run this there:</p>
+          <code class="cmd" id="h-cmd"></code>
+          <p class="note">After Finish, Ops shows a DM route row. It turns OK by itself once the helper answers (within two minutes).
+            Using the official TAK Server? This helper is for OpenTAKServer only.</p>
+        </div>
+      </section>
+
+      <section data-step="7" class="hidden">
+        <h2 id="fin-title">Ready to save</h2>
+        <p class="lead" id="fin-lead">These settings go into deck.ini (a backup is kept), and the certificates into ~/certs.</p>
+        <div class="box" id="plan"></div>
+        <div id="finerr" class="msg bad hidden" role="alert"></div>
+        <div id="restart" class="hidden"><p>Restart the services to use the new settings, in a terminal:</p><code class="cmd">meshtoc restart</code>
+          <p><button type="button" class="acc" id="recheck">RUN THE CHECK</button></p></div>
+        <div class="box hidden" id="checkrows"></div>
+        <p class="note hidden" id="fin-note">Change anything later: Ops › SETUP › Run setup again. Ops' SETUP page and meshtoc check run this same test.</p>
+      </section>
+    </main>
+  </div>
+  <footer>
+    <button type="button" id="back">&lt; BACK</button>
+    <div style="display:flex;gap:12px"><a class="btn hidden" id="toops" href="/">OPEN OPS</a><button type="button" class="pri" id="next">NEXT &gt;</button></div>
+  </footer>
+</div>
+<script src="setup.js"></script>
+</body>
+</html>

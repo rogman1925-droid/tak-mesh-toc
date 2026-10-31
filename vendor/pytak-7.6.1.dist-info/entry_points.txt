@@ -1,0 +1,2 @@
+[console_scripts]
+pytak = pytak.cli_main:main
