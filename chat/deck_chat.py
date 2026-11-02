@@ -67,7 +67,7 @@ DEFAULTS = {
     "ROSTER_MINUTES": "10",
     "SA_SEND": "1",                         # announce the deck on the mesh so phones can DM it
     "SA_INTERVAL": "60",
-    "DM_PORT": "4242",                      # where mesh phones deliver direct messages (TCP)
+    "DM_PORT": "4242",                      # where mesh phones deliver direct messages (TCP; iTAK: UDP)
     "LOCAL_SEND": "127.0.0.1:17014",        # bridge port for DMs to people on the server
     "LAT": "0",
     "LON": "0",
@@ -926,6 +926,56 @@ def dm_client(chat, conn, peer):
             pass
 
 
+def dm_udp_listener(chat):
+    """UDP DM_PORT on the mesh address: iTAK sends direct messages by UDP to the endpoint in our position
+    report, even though it says tcp. Same handling as dm_client; a repeated copy is ignored (same id)."""
+    port = int(chat.cfg["DM_PORT"])
+    while True:
+        local = chat.local_addr()
+        if not local:
+            time.sleep(5)
+            continue
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((local, port))
+            s.settimeout(5)
+        except OSError as exc:
+            log.warning("DM port %s:%d (udp) unavailable (%s); retrying in 30 s", local, port, exc)
+            time.sleep(30)
+            continue
+        log.info("Listening for direct messages on %s:%d (udp, for iTAK)", local, port)
+        while True:
+            try:
+                d, _ = s.recvfrom(65536)
+            except socket.timeout:
+                if chat.local_addr() != local:
+                    break
+                continue
+            except OSError:
+                break
+            if d[:1] == b"\xbf":
+                try:
+                    d = proto_to_xml(d) or b""
+                except Exception:
+                    d = b""
+            j, k = d.find(b"<event"), d.rfind(b"</event>")
+            if j < 0 or k < j:
+                continue
+            ev = d[j:k + len(b"</event>")]
+            m = parse_chat(ev)
+            if m:
+                chat.add(m, "mesh")
+            else:
+                r = parse_sa(ev)
+                if r:
+                    chat.heard(r[0], r[1], "mesh", r[3])
+        try:
+            s.close()
+        except OSError:
+            pass
+
+
 def sa_sender(chat):
     """Announce the deck on the mesh (contact + DM endpoint) every SA_INTERVAL seconds."""
     interval = max(15.0, float(chat.cfg["SA_INTERVAL"]))
@@ -1205,6 +1255,7 @@ def main():
     threading.Thread(target=bridge_copy_listener, args=(chat,), daemon=True).start()
     threading.Thread(target=outbox_worker, args=(chat,), daemon=True).start()
     threading.Thread(target=dm_listener, args=(chat,), daemon=True).start()
+    threading.Thread(target=dm_udp_listener, args=(chat,), daemon=True).start()
     if cfg["SA_SEND"].strip().lower() not in ("0", "off", "no", "false") and cfg["SA_GROUP"].strip().lower() not in ("", "off"):
         threading.Thread(target=sa_sender, args=(chat,), daemon=True).start()
     host, port = hostport(cfg["LISTEN"])

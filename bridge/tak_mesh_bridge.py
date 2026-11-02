@@ -1000,6 +1000,7 @@ DEST_CS_RE = re.compile(rb'<dest\b[^<>]*?\scallsign="([^"]+)"')
 DEST_UID_RE = re.compile(rb'<dest\b[^<>]*?\suid="([^"]+)"')
 CHATROOM_RE = re.compile(rb'<__chat\b[^<>]*?\schatroom="([^"]+)"')
 UID1_RE = re.compile(rb'<chatgrp\b[^<>]*?\suid1="([^"]+)"')
+EVENT_UID_RE = re.compile(rb'<event\b[^<>]*?\suid="([^"]+)"')
 MESH_EP_RE = re.compile(rb"^(\d+\.\d+\.\d+\.\d+):(\d+):(tcp|udp)$")
 
 
@@ -1094,6 +1095,19 @@ class DMRelay:
         self.tx_queue = tx_queue
         self.port = int(cfg.get("DM_RELAY_PORT", "4243"))
         self.host = cfg.get("PYTAK_MULTICAST_LOCAL_ADDR", "").strip()
+        self.seen = {}           # event uid -> when relayed (drops repeated copies for 10 min)
+        self.udp = None
+
+    def _datagram(self, data, peer):
+        """One UDP datagram (iTAK sends DMs by UDP to our endpoint even though it says tcp)."""
+        if data[:1] == b"\xbf":
+            try:
+                data = (proto_to_xml(data) if takproto is not None else None) or b""
+            except Exception:
+                data = b""
+        j, k = data.find(b"<event"), data.rfind(b"</event>")
+        if j >= 0 and k > j:
+            asyncio.ensure_future(self._one(data[j:k + len(b"</event>")], peer))
 
     async def _client(self, reader, writer):
         peer = writer.get_extra_info("peername")
@@ -1120,6 +1134,14 @@ class DMRelay:
         mt = TYPE_RE.search(ev)
         if not mt or not mt.group(1).startswith(CHAT_PREFIX):
             return                                # only direct chat is relayed
+        mu = EVENT_UID_RE.search(ev)
+        if mu:                                    # iTAK sends each DM twice over UDP: relay it once
+            now = time.monotonic()
+            for k in [k for k, t in self.seen.items() if now - t > 600]:
+                del self.seen[k]
+            if mu.group(1) in self.seen:
+                return
+            self.seen[mu.group(1)] = now
         room = CHATROOM_RE.search(ev)
         uid1 = UID1_RE.search(ev)
         to = Peers.find_server(room.group(1).decode(errors="replace") if room else None,
@@ -1146,8 +1168,16 @@ class DMRelay:
     async def run(self, _=-1):
         while True:
             try:
+                if self.udp is None:             # UDP first: a failed bind leaves no TCP server holding the port
+                    relay = self
+
+                    class _Udp(asyncio.DatagramProtocol):
+                        def datagram_received(self, data, addr):
+                            relay._datagram(data, addr)
+                    self.udp, _ = await asyncio.get_running_loop().create_datagram_endpoint(
+                        _Udp, local_addr=(self.host, self.port))
                 server = await asyncio.start_server(self._client, self.host, self.port)
-                log.info("DM relay listening on %s:%d (mesh phones -> server people)", self.host, self.port)
+                log.info("DM relay listening on %s:%d tcp+udp (mesh phones -> server people)", self.host, self.port)
                 self._told = False
                 async with server:
                     await server.serve_forever()
@@ -1159,8 +1189,36 @@ class DMRelay:
                 await asyncio.sleep(5)
 
 
+def strip_marti(data):
+    """Remove the server's addressing (<marti><dest .../></marti>) from a DM handed to a mesh phone.
+    iTAK drops a direct DM that still carries it (ATAK ignores it); on the mesh it means nothing.
+    Plain string search, no regex: linear on any input. An unclosed <marti> is left alone."""
+    data, out, i = bytes(data), [], 0
+    while True:
+        j = data.find(b"<marti", i)
+        if j < 0 or data[j + 6:j + 7] not in (b">", b" ", b"/", b"\t", b"\n", b"\r"):
+            if j < 0:
+                break
+            out.append(data[i:j + 6]); i = j + 6
+            continue
+        gt = data.find(b">", j)
+        if gt < 0:
+            break
+        if data[gt - 1:gt] == b"/":
+            end = gt + 1                                  # <marti/>
+        else:
+            k = data.find(b"</marti>", gt)
+            if k < 0:
+                break
+            end = k + len(b"</marti>")
+        out.append(data[i:j]); i = end
+    out.append(data[i:])
+    return b"".join(out)
+
+
 async def deliver_to_mesh(target, data):
     """Send one CoT straight to a mesh phone's DM endpoint. Returns '' or an error."""
+    data = strip_marti(data)
     try:
         if target["proto"] == "udp":
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

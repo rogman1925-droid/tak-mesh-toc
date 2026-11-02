@@ -1,5 +1,24 @@
 # Changes
 
+## 3.1.6: server DMs reach iTAK on the mesh
+- **DMs from server phones to an iPhone on the mesh now show in iTAK.** The bridge delivered them, but iTAK silently
+  drops a direct message that still carries the server's addressing (`<marti><dest .../></marti>`); ATAK ignores it.
+  The bridge now removes that block from the copy it hands to the mesh phone. It still uses it to pick the
+  recipient. Nothing else in the message changes; broadcasts, positions and markers are untouched.
+- README, iTAK section: iOS sends iTAK's position reports over cellular when the mesh Wi-Fi has no internet, so turn
+  Cellular Data and Wi-Fi Assist off on the mesh; and close iTAK's server connection before moving it to the mesh.
+- `itak_udp_dm_test.py`: 7 more checks (the server DM arrives without `<marti>`, otherwise byte for byte the same).
+
+## 3.1.5: iTAK direct messages from the mesh
+- **DMs sent by iTAK on the mesh now arrive.** iTAK sends direct messages by UDP to the address in a contact's
+  position report, even when that address says tcp, and sends each one twice. The deck only listened on TCP, so iTAK's
+  DMs to the deck (port 4242) and to server people through the DM relay (port 4243) were silently lost, while ATAK's
+  worked. Deck Chat and the DM relay now also listen on UDP on the same ports, take XML and TAK protobuf, and deliver
+  each message once (the relay remembers each message for 10 minutes). The TCP path is unchanged.
+- README, iTAK section: iOS needs Local Network permission for iTAK, or the iPhone never appears on the mesh; on the
+  mesh iTAK sends DMs but not All Chat Rooms.
+- New test `itak_udp_dm_test.py`; it fails on 3.1.4.
+
 ## 3.1.4: copyright line
 - README and THIRD_PARTY_NOTICES name the copyright holder. The license is unchanged (GPL-3.0-or-later).
   No program changes.

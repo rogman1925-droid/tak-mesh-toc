@@ -24,6 +24,7 @@ clean proto_test.py /tmp/mmb_proto_test
 run suite_test.py /tmp/mmb_suite_test
 run outbox_test.py
 clean dm_filter_test.py
+clean itak_udp_dm_test.py
 clean ident_check.py
 clean durability_test.py
 clean pytak_patch_test.py

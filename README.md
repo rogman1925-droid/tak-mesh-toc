@@ -113,7 +113,7 @@ and leaves it alone. If a server DM to a mesh phone doesn't arrive, check that p
 server. Use one or the other.
 
 ## iTAK (iPhone) users
-iTAK works, but it differs from ATAK in ways that silently break things. Four lessons from real use:
+iTAK works, but it differs from ATAK in ways that silently break things. Lessons from real use:
 
 1. **The deck needs a team.** iTAK only lists something as a person you can message if its report carries a team
    (`TEAM` and `ROLE` in `[deck]`; the example config sets `Cyan` / `HQ`). Without a team, iTAK shows the deck as a
@@ -133,6 +133,19 @@ iTAK works, but it differs from ATAK in ways that silently break things. Four le
    - **To see what's happening:** MediaMTX may log to a file instead of the system journal. The `logFile:` line in
      `mediamtx.yml` says where. A connection that never appears there means iTAK can't reach the server: check the
      address (copy it from `tailscale ip -4` on the server) and that the iPhone's VPN is on.
+5. **iTAK on the mesh needs Local Network permission.** iPhone Settings → Privacy & Security → Local Network → turn
+   **iTAK** on, then reopen iTAK. Without it, iOS blocks all of iTAK's mesh traffic and shows no error: the iPhone
+   never appears on the mesh.
+6. **On the mesh, iTAK sends DMs but not All Chat Rooms.** iTAK sends its position and direct messages over the mesh,
+   but in testing it sent nothing when posting to All Chat Rooms, so no mesh phone, the deck or the server sees it.
+   iPhone users on the mesh use DMs; All Chat Rooms works from iTAK when it is connected to the server directly.
+   iTAK sends DMs by UDP (and each one twice) even to an endpoint that says tcp; the deck takes both (3.1.5 or newer).
+   iTAK also drops a DM that still carries the server's `<marti>` addressing; the bridge removes it (3.1.6 or newer).
+7. **Turn Cellular Data off on the mesh.** The mesh Wi-Fi has no internet, so iOS keeps cellular as its main network
+   and sends iTAK's position reports there, where they vanish: the iPhone sees everyone, but nobody sees it. Turn off
+   Cellular Data (or use Airplane Mode with Wi-Fi on) and Wi-Fi Assist (Settings → Cellular), then reconnect to the
+   node. Also close iTAK's server connection before moving it to the mesh: until the server notices the old
+   connection is gone, server DMs for that iPhone wait in its old server mailbox instead of coming over the mesh.
 
 ## Voice
 OpenMANET nodes have push-to-talk voice built in: talk groups on the mesh. The deck can carry those talk groups to a
